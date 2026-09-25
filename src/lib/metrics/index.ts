@@ -48,3 +48,5 @@ export async function getLivePlatformMetrics(): Promise<PlatformMetrics> {
     };
   }
 }
+
+export { getContributorMetrics } from "./contributor-metrics";

@@ -36,6 +36,9 @@ describe("Contributor Progression Automation Pipeline", () => {
       primaryLanguage: "TypeScript",
       languages: ["TypeScript"],
       isOfficial: true,
+      contributionEnabled: true,
+      firstPrEnabled: true,
+      approvedAt: new Date(),
     });
   });
 

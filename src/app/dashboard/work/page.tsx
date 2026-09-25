@@ -7,6 +7,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { determineNextAction } from "@/lib/progression/next-action";
 import { evaluateProgression, type ContributorLevel } from "@/lib/progression/rules";
 import { expireOverdueClaims } from "@/lib/issues/claims";
+import { getContributorMetrics } from "@/lib/metrics";
 
 export const metadata = {
   title: "My Work & Contributions — TechNexusOrg",
@@ -112,32 +113,9 @@ export default async function MyWorkPage() {
     .where(eq(schema.credentials.userId, sessionUser.id))
     .orderBy(desc(schema.credentials.issuedAt));
 
-  // 5. Progression metrics
-  const completedClaimsCount = await db
-    .select({ id: schema.issueClaims.id })
-    .from(schema.issueClaims)
-    .where(
-      and(
-        eq(schema.issueClaims.userId, sessionUser.id),
-        eq(schema.issueClaims.status, "completed")
-      )
-    );
-
-  const reviewsCount = await db
-    .select({ id: schema.pullRequestReviews.id })
-    .from(schema.pullRequestReviews)
-    .where(eq(schema.pullRequestReviews.reviewerGithubId, sessionUser.githubId));
-
-  const uniqueProjects = new Set(userContributions.map((c: any) => c.githubRepo));
-
-  const progression = evaluateProgression(sessionUser.level as ContributorLevel, {
-    prsOpened: userPrs.length,
-    prsMerged: userContributions.filter((c: any) => c.state === "merged").length,
-    issuesResolved: completedClaimsCount.length,
-    reviewsCompleted: reviewsCount.length,
-    projectsContributedCount: uniqueProjects.size,
-    isOnboarded: true,
-  });
+  // 5. Gather authoritative progression metrics
+  const metrics = await getContributorMetrics(sessionUser.id, db);
+  const progression = evaluateProgression(sessionUser.level as ContributorLevel, metrics);
 
   // 6. Calculate Next Action
   const activeClaim = activeClaims[0] || null;
