@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, or, desc } from "drizzle-orm";
 import { evaluateProgression, type ContributorLevel } from "@/lib/progression/rules";
 import { recommendIssues } from "@/lib/recommendations/engine";
 import { expireOverdueClaims } from "@/lib/issues/claims";
@@ -101,11 +101,44 @@ export default async function DashboardPage() {
   const profile = userProfiles[0];
   const mergedCount = userContributions.filter((c: any) => c.state === "merged").length;
 
+  // Real database metrics for progression calculation
+  const completedClaims = await db
+    .select({ id: schema.issueClaims.id })
+    .from(schema.issueClaims)
+    .where(
+      and(
+        eq(schema.issueClaims.userId, sessionUser.id),
+        eq(schema.issueClaims.status, "completed")
+      )
+    );
+
+  const userReviews = await db
+    .select({ id: schema.pullRequestReviews.id })
+    .from(schema.pullRequestReviews)
+    .where(
+      and(
+        eq(schema.pullRequestReviews.reviewerGithubId, sessionUser.githubId),
+        or(
+          eq(schema.pullRequestReviews.reviewState, "approved"),
+          eq(schema.pullRequestReviews.reviewState, "changes_requested")
+        )
+      )
+    );
+
+  const userOpenedPrs = await db
+    .select({ id: schema.pullRequests.id })
+    .from(schema.pullRequests)
+    .where(eq(schema.pullRequests.userId, sessionUser.id));
+
+  const issuesResolved = completedClaims.length;
+  const reviewsCompleted = userReviews.length;
+  const prsOpened = Math.max(userContributions.length, userOpenedPrs.length);
+
   const progression = evaluateProgression(sessionUser.level as any, {
-    prsOpened: userContributions.length,
+    prsOpened,
     prsMerged: mergedCount,
-    issuesResolved: 0,
-    reviewsCompleted: 0,
+    issuesResolved,
+    reviewsCompleted,
     projectsContributedCount: new Set(userContributions.map((c: any) => c.projectId)).size,
     isOnboarded: sessionUser.isOnboarded,
   });
