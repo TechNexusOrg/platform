@@ -49,35 +49,63 @@ export async function claimFoundingMembership(
     };
   }
 
-  // 2. Determine the next sequential member number
-  const maxResult = await db
-    .select({
-      maxNumber: sql<number>`COALESCE(MAX(${schema.foundingMembers.memberNumber}), 0)`,
-    })
-    .from(schema.foundingMembers);
-
-  const nextNumber = Number(maxResult[0]?.maxNumber || 0) + 1;
-
-  if (nextNumber > 1000) {
-    return {
-      claimed: false,
-      reason: "cohort_full",
-    };
-  }
-
+  // 2. Determine the next sequential member number atomically with retry loop
   const foundingId = `founding_${crypto.randomUUID()}`;
   const now = new Date();
+  let nextNumber = 0;
+  let attempts = 0;
 
-  // 3. Insert into founding_members
-  await db.insert(schema.foundingMembers).values({
-    id: foundingId,
-    userId: params.userId,
-    memberNumber: nextNumber,
-    status: "active",
-    firstPrId: params.contributionId,
-    verifiedAt: now,
-    createdAt: now,
-  });
+  while (attempts < 5) {
+    attempts++;
+    const maxResult = await db
+      .select({
+        maxNumber: sql<number>`COALESCE(MAX(${schema.foundingMembers.memberNumber}), 0)`,
+      })
+      .from(schema.foundingMembers);
+
+    nextNumber = Number(maxResult[0]?.maxNumber || 0) + 1;
+
+    if (nextNumber > 1000) {
+      return {
+        claimed: false,
+        reason: "cohort_full",
+      };
+    }
+
+    try {
+      await db.insert(schema.foundingMembers).values({
+        id: foundingId,
+        userId: params.userId,
+        memberNumber: nextNumber,
+        status: "active",
+        firstPrId: params.contributionId,
+        verifiedAt: now,
+        createdAt: now,
+      });
+      break; // Successfully reserved sequential number
+    } catch (err: any) {
+      // If concurrent collision on unique memberNumber, re-attempt
+      if (err.message?.includes("member_number") || err.code === "23505") {
+        continue;
+      }
+      // If user was claimed in parallel
+      if (err.message?.includes("user_id") || err.message?.includes("already exists")) {
+        const parallel = await db
+          .select()
+          .from(schema.foundingMembers)
+          .where(eq(schema.foundingMembers.userId, params.userId))
+          .limit(1);
+        if (parallel.length > 0) {
+          return {
+            claimed: true,
+            memberNumber: parallel[0].memberNumber,
+            reason: "already_claimed",
+          };
+        }
+      }
+      throw err;
+    }
+  }
 
   // 4. Mirror foundingNumber to users table
   await db
