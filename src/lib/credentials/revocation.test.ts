@@ -13,16 +13,27 @@ describe("Credential Revocation & Audit Logging", () => {
 
     const db = await getDb();
 
-    // Seed test user
-    await db.insert(schema.users).values({
-      id: userId,
-      githubId: 77889900,
-      githubUsername: "revocation_target",
-      displayName: "Target User",
-      role: "contributor",
-      level: "contributor",
-      isOnboarded: true,
-    });
+    // Seed test users
+    await db.insert(schema.users).values([
+      {
+        id: userId,
+        githubId: 77889900,
+        githubUsername: "revocation_target",
+        displayName: "Target User",
+        role: "contributor",
+        level: "contributor",
+        isOnboarded: true,
+      },
+      {
+        id: "usr_admin_001",
+        githubId: 11223344,
+        githubUsername: "admin_user",
+        displayName: "Admin User",
+        role: "admin",
+        level: "maintainer",
+        isOnboarded: true,
+      },
+    ]);
 
     // Seed test credential
     await db.insert(schema.credentials).values({
