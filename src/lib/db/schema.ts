@@ -345,7 +345,6 @@ export const pullRequests = pgTable(
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
-      .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     projectId: text("project_id")
       .notNull()
