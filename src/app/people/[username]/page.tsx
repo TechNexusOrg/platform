@@ -87,6 +87,23 @@ export default async function ContributorPassportPage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8 space-y-10">
+      {/* Schema.org Person JSON-LD */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Person",
+            name: user.displayName || user.githubUsername,
+            alternateName: user.githubUsername,
+            url: `https://platform.technexus.org/people/${user.githubUsername}`,
+            image: user.avatarUrl,
+            description: user.bio,
+            knowsAbout: profile?.skills || [],
+          }),
+        }}
+      />
+
       {/* Contributor Passport Hero Header */}
       <div className="rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-900/60 to-slate-950 p-6 sm:p-8 space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
@@ -136,6 +153,15 @@ export default async function ContributorPassportPage({
             >
               <span>GitHub Profile</span>
               <span>↗</span>
+            </a>
+            <a
+              href={`/api/people/${user.githubUsername}/export`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-xs font-mono font-medium text-slate-200 hover:text-white hover:border-slate-600 transition-colors"
+            >
+              <span>Export JSON</span>
+              <span>↓</span>
             </a>
             {isOwner && (
               <Link
