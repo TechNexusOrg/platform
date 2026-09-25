@@ -69,7 +69,7 @@ export const profiles = pgTable(
     skills: jsonb("skills").$type<string[]>().default([]).notNull(),
     interests: jsonb("interests").$type<string[]>().default([]).notNull(),
     experienceLevel: text("experience_level", {
-      enum: ["beginner", "intermediate", "advanced"],
+      enum: ["complete_beginner", "beginner", "intermediate", "advanced"],
     })
       .default("beginner")
       .notNull(),
@@ -77,10 +77,20 @@ export const profiles = pgTable(
       .$type<string[]>()
       .default([])
       .notNull(),
+    technologies: jsonb("technologies")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
+    tools: jsonb("tools")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
     contributionPreferences: jsonb("contribution_preferences")
       .$type<string[]>()
       .default([])
       .notNull(),
+    timeCommitment: text("time_commitment"),
+    primaryGoal: text("primary_goal"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -106,6 +116,9 @@ export const projects = pgTable(
       .notNull(),
     maintainerId: text("maintainer_id").references(() => users.id),
     isOfficial: boolean("is_official").default(true).notNull(),
+    contributionEnabled: boolean("contribution_enabled").default(true).notNull(),
+    firstPrEnabled: boolean("first_pr_enabled").default(true).notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).defaultNow(),
     starsCount: integer("stars_count").default(0).notNull(),
     forksCount: integer("forks_count").default(0).notNull(),
     openIssuesCount: integer("open_issues_count").default(0).notNull(),
@@ -287,5 +300,189 @@ export const auditLogs = pgTable(
     index("audit_logs_actor_id_idx").on(table.actorId),
     index("audit_logs_action_idx").on(table.action),
     index("audit_logs_target_idx").on(table.targetType, table.targetId),
+  ]
+);
+
+// --- ISSUE CLAIMS ---
+export const issueClaims = pgTable(
+  "issue_claims",
+  {
+    id: text("id").primaryKey(),
+    issueId: text("issue_id")
+      .notNull()
+      .references(() => issues.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["active", "completed", "released", "expired", "cancelled"],
+    })
+      .default("active")
+      .notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("issue_claims_issue_id_idx").on(table.issueId),
+    index("issue_claims_user_id_idx").on(table.userId),
+    index("issue_claims_status_idx").on(table.status),
+  ]
+);
+
+// --- PULL REQUESTS ---
+export const pullRequests = pgTable(
+  "pull_requests",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    issueId: text("issue_id").references(() => issues.id),
+    githubPrId: integer("github_pr_id").notNull(),
+    githubPrNumber: integer("github_pr_number").notNull(),
+    title: text("title").notNull(),
+    url: text("url").notNull().unique(),
+    state: text("state", {
+      enum: ["open", "approved", "changes_requested", "merged", "closed"],
+    })
+      .default("open")
+      .notNull(),
+    draft: boolean("draft").default(false).notNull(),
+    mergeCommitSha: text("merge_commit_sha"),
+    openedAt: timestamp("opened_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    mergedAt: timestamp("merged_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("pull_requests_url_idx").on(table.url),
+    index("pull_requests_user_id_idx").on(table.userId),
+    index("pull_requests_project_id_idx").on(table.projectId),
+    index("pull_requests_issue_id_idx").on(table.issueId),
+    index("pull_requests_state_idx").on(table.state),
+  ]
+);
+
+// --- PULL REQUEST REVIEWS ---
+export const pullRequestReviews = pgTable(
+  "pull_request_reviews",
+  {
+    id: text("id").primaryKey(),
+    pullRequestId: text("pull_request_id")
+      .notNull()
+      .references(() => pullRequests.id, { onDelete: "cascade" }),
+    reviewerGithubId: integer("reviewer_github_id").notNull(),
+    reviewerUsername: text("reviewer_username").notNull(),
+    reviewState: text("review_state", {
+      enum: ["approved", "changes_requested", "commented", "dismissed"],
+    }).notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    githubReviewId: integer("github_review_id"),
+    htmlUrl: text("html_url"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("pr_reviews_pull_request_id_idx").on(table.pullRequestId),
+    index("pr_reviews_reviewer_username_idx").on(table.reviewerUsername),
+    index("pr_reviews_review_state_idx").on(table.reviewState),
+  ]
+);
+
+// --- GITHUB WEBHOOK DELIVERIES (IDEMPOTENCY) ---
+export const githubWebhookDeliveries = pgTable(
+  "github_webhook_deliveries",
+  {
+    id: text("id").primaryKey(),
+    deliveryId: text("delivery_id").notNull().unique(),
+    eventType: text("event_type").notNull(),
+    repository: text("repository").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    status: text("status", { enum: ["received", "processed", "ignored", "error"] })
+      .default("received")
+      .notNull(),
+    error: text("error"),
+  },
+  (table) => [
+    uniqueIndex("webhook_deliveries_delivery_id_idx").on(table.deliveryId),
+    index("webhook_deliveries_status_idx").on(table.status),
+  ]
+);
+
+// --- NOTIFICATIONS ---
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    linkUrl: text("link_url"),
+    isRead: boolean("is_read").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("notifications_user_id_idx").on(table.userId),
+    index("notifications_is_read_idx").on(table.isRead),
+  ]
+);
+
+// --- MENTOR REQUESTS ---
+export const mentorRequests = pgTable(
+  "mentor_requests",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    mentorId: text("mentor_id").references(() => users.id),
+    issueId: text("issue_id")
+      .notNull()
+      .references(() => issues.id, { onDelete: "cascade" }),
+    message: text("message").notNull(),
+    reply: text("reply"),
+    status: text("status", { enum: ["open", "in_progress", "resolved", "closed"] })
+      .default("open")
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("mentor_requests_student_id_idx").on(table.studentId),
+    index("mentor_requests_mentor_id_idx").on(table.mentorId),
+    index("mentor_requests_issue_id_idx").on(table.issueId),
+    index("mentor_requests_status_idx").on(table.status),
   ]
 );

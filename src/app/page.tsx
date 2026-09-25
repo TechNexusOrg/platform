@@ -33,10 +33,10 @@ export default async function HomePage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Link
-              href="/founding-1000"
+              href="/join"
               className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg bg-sky-500 px-6 py-3 text-sm font-semibold text-slate-950 shadow-sm hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 transition-all font-mono"
             >
-              Join Founding 1,000
+              Join with GitHub
             </Link>
             <Link
               href="/projects"
