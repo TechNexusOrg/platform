@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 
 export interface MarketplaceIssue {
   id: string;
@@ -188,9 +189,9 @@ export function IssueMarketplace({ initialIssues }: { initialIssues: Marketplace
                 </div>
 
                 <h3 className="text-sm sm:text-base font-bold text-white hover:text-sky-300 transition-colors">
-                  <a href={issue.htmlUrl} target="_blank" rel="noopener noreferrer">
+                  <Link href={`/issues/${issue.id}`}>
                     {issue.title}
-                  </a>
+                  </Link>
                 </h3>
 
                 {issue.bodySnippet && (
@@ -214,20 +215,28 @@ export function IssueMarketplace({ initialIssues }: { initialIssues: Marketplace
               </div>
 
               <div className="flex sm:flex-col items-center sm:items-end gap-2.5 shrink-0 w-full sm:w-auto justify-between sm:justify-center border-t sm:border-t-0 border-slate-800 pt-3 sm:pt-0">
-                <a
-                  href={issue.htmlUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-mono font-semibold text-slate-950 hover:bg-sky-400 transition-colors inline-flex items-center gap-1.5"
+                <Link
+                  href={`/issues/${issue.id}`}
+                  className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-mono font-bold text-slate-950 hover:bg-sky-400 transition-colors inline-flex items-center gap-1.5 shadow-sm"
                 >
-                  <span>View Issue</span>
-                  <span>↗</span>
-                </a>
-                {issue.estimatedEffort && (
-                  <span className="text-[10px] font-mono text-slate-500">
-                    Est: {issue.estimatedEffort}
-                  </span>
-                )}
+                  <span>Start Contribution</span>
+                  <span>→</span>
+                </Link>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={issue.htmlUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-mono text-slate-400 hover:text-sky-300 transition-colors"
+                  >
+                    GitHub ↗
+                  </a>
+                  {issue.estimatedEffort && (
+                    <span className="text-[10px] font-mono text-slate-500">
+                      • {issue.estimatedEffort}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
