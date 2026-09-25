@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getLivePlatformMetrics } from "@/lib/metrics";
+import { getDb, schema } from "@/lib/db";
+import { eq, and, desc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,26 @@ export const metadata = {
 
 export default async function FirstPRPage() {
   const metrics = await getLivePlatformMetrics();
+  const db = await getDb();
+
+  const recentFirstPrs = await db
+    .select({
+      id: schema.contributions.id,
+      prNumber: schema.contributions.githubPrNumber,
+      prTitle: schema.contributions.prTitle,
+      prUrl: schema.contributions.prUrl,
+      mergedAt: schema.contributions.mergedAt,
+      username: schema.users.githubUsername,
+      displayName: schema.users.displayName,
+      avatarUrl: schema.users.avatarUrl,
+      repo: schema.projects.githubRepo,
+    })
+    .from(schema.contributions)
+    .innerJoin(schema.users, eq(schema.contributions.userId, schema.users.id))
+    .innerJoin(schema.projects, eq(schema.contributions.projectId, schema.projects.id))
+    .where(and(eq(schema.contributions.isFirstPr, true), eq(schema.contributions.state, "merged")))
+    .orderBy(desc(schema.contributions.mergedAt))
+    .limit(10);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 space-y-12">
@@ -95,6 +117,63 @@ export default async function FirstPRPage() {
             Browse Good First Issues →
           </Link>
         </div>
+      </div>
+
+      {/* Live Recent Graduates */}
+      <div className="max-w-4xl mx-auto space-y-4">
+        <h2 className="text-sm font-bold text-white font-mono uppercase tracking-wider">
+          Recent #FirstPR Graduates
+        </h2>
+
+        {recentFirstPrs.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center">
+            <p className="text-xs text-slate-400 font-mono">
+              No #FirstPR completions recorded yet.
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Be the first contributor to merge a pull request and claim permanent proof of work!
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {recentFirstPrs.map((grad: any) => (
+              <div
+                key={grad.id}
+                className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 p-3"
+              >
+                <div className="flex items-center gap-3">
+                  {grad.avatarUrl && (
+                    <img
+                      src={grad.avatarUrl}
+                      alt={grad.username}
+                      className="h-8 w-8 rounded-full border border-slate-700"
+                    />
+                  )}
+                  <div>
+                    <Link
+                      href={`/people/${grad.username}`}
+                      className="text-xs font-bold text-white hover:text-sky-300 transition-colors"
+                    >
+                      {grad.displayName || grad.username}
+                    </Link>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      PR #{grad.prNumber} in {grad.repo}
+                    </div>
+                  </div>
+                </div>
+
+                <a
+                  href={grad.prUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] font-mono text-sky-400 hover:text-sky-300"
+                >
+                  GitHub PR ↗
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

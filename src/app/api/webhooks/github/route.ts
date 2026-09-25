@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, type WebhookPullRequestEvent } from "@/lib/github/webhooks";
 import { getDb, schema } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
-import {
-  generateCredentialId,
-  buildCredentialMetadata,
-  formatVerificationUrl,
-  type CredentialEvidence,
-} from "@/lib/credentials/engine";
-import { evaluateProgression } from "@/lib/progression/rules";
+import { processProgressionOnContribution } from "@/lib/progression/pipeline";
 
 export async function POST(request: NextRequest) {
   const signature = request.headers.get("x-hub-signature-256");
@@ -99,84 +93,27 @@ export async function POST(request: NextRequest) {
           verificationSource: "github_webhook",
         });
 
-        // 4. Issue verifiable credential for First PR if applicable
-        if (isFirstPr) {
-          const credId = generateCredentialId("first_pr_merged", user.id);
-          const evidence: CredentialEvidence = {
-            githubUsername: user.githubUsername,
-            repository: repoFullName,
-            prNumber: pr.number,
-            prUrl: pr.html_url,
-            prTitle: pr.title,
-            mergedAt: mergedDate.toISOString(),
-            verifiedAt: new Date().toISOString(),
-          };
-          const meta = buildCredentialMetadata("first_pr_merged", evidence);
-
-          await db.insert(schema.credentials).values({
-            id: credId,
-            userId: user.id,
-            type: "first_pr_merged",
-            title: meta.title,
-            description: meta.description,
-            status: "active",
-            issuer: "TechNexusOrg",
-            issuedAt: new Date(),
-            evidenceData: evidence,
-            verificationUrl: formatVerificationUrl(credId),
-          });
-
-          // Check if user is in Founding 1,000 to verify
-          await db
-            .update(schema.foundingMembers)
-            .set({
-              status: "active",
-              firstPrId: contributionId,
-              verifiedAt: new Date(),
-            })
-            .where(eq(schema.foundingMembers.userId, user.id));
-        }
-
-        // 5. Evaluate and update contributor progression
-        const totalMerged = existingContributions.length + 1;
-        const progression = evaluateProgression(user.level as any, {
-          prsOpened: totalMerged,
-          prsMerged: totalMerged,
-          issuesResolved: 0,
-          reviewsCompleted: 0,
-          projectsContributedCount: 1,
-          isOnboarded: user.isOnboarded,
+        // 4. Process contributor progression, credentials, and Founding 1,000 cohort
+        const progressionResult = await processProgressionOnContribution(db, {
+          userId: user.id,
+          contributionId,
+          githubUsername: user.githubUsername,
+          repoFullName,
+          prNumber: pr.number,
+          prUrl: pr.html_url,
+          prTitle: pr.title,
+          mergedAt: mergedDate,
+          isFirstPr,
         });
-
-        if (progression.canPromote) {
-          await db
-            .update(schema.users)
-            .set({
-              level: progression.eligibleLevel,
-              updatedAt: new Date(),
-            })
-            .where(eq(schema.users.id, user.id));
-
-          // Log promotion audit
-          await db.insert(schema.auditLogs).values({
-            id: `audit_${crypto.randomUUID()}`,
-            actorId: user.id,
-            action: "user.promoted",
-            targetType: "user",
-            targetId: user.id,
-            metadata: {
-              previousLevel: user.level,
-              newLevel: progression.eligibleLevel,
-              reason: "Automated progression based on verified PR merge",
-            },
-          });
-        }
 
         return NextResponse.json({
           status: "success",
           contributionId,
           isFirstPr,
-          level: progression.eligibleLevel,
+          promoted: progressionResult.promoted,
+          level: progressionResult.newLevel,
+          credentialsIssued: progressionResult.credentialsIssued,
+          foundingMemberNumber: progressionResult.foundingMemberNumber,
         });
       }
     } catch (err: any) {
