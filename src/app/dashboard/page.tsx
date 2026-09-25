@@ -5,6 +5,7 @@ import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { evaluateProgression } from "@/lib/progression/rules";
+import { recommendIssues } from "@/lib/recommendations/engine";
 
 export const metadata = {
   title: "Contributor Dashboard — TechNexusOrg",
@@ -61,6 +62,46 @@ export default async function DashboardPage() {
     projectsContributedCount: new Set(userContributions.map((c: any) => c.projectId)).size,
     isOnboarded: sessionUser.isOnboarded,
   });
+
+  // Fetch open issues for recommendations
+  const openIssues = await db
+    .select({
+      id: schema.issues.id,
+      projectId: schema.issues.projectId,
+      projectName: schema.projects.name,
+      githubRepo: schema.projects.githubRepo,
+      title: schema.issues.title,
+      bodySnippet: schema.issues.bodySnippet,
+      htmlUrl: schema.issues.htmlUrl,
+      labels: schema.issues.labels,
+      difficulty: schema.issues.difficulty,
+      estimatedEffort: schema.issues.estimatedEffort,
+      skillsRequired: schema.issues.skillsRequired,
+      isGoodFirstIssue: schema.issues.isGoodFirstIssue,
+      isHelpWanted: schema.issues.isHelpWanted,
+      primaryLanguage: schema.projects.primaryLanguage,
+    })
+    .from(schema.issues)
+    .innerJoin(schema.projects, eq(schema.issues.projectId, schema.projects.id))
+    .where(eq(schema.issues.state, "open"))
+    .limit(50);
+
+  const recommended = profile
+    ? recommendIssues(
+        openIssues.map((i: any) => ({
+          ...i,
+          difficulty: i.difficulty as "beginner" | "intermediate" | "advanced",
+        })),
+        {
+          skills: profile.skills || [],
+          interests: profile.interests || [],
+          experienceLevel: (profile.experienceLevel as any) || "beginner",
+          preferredLanguages: profile.preferredLanguages || [],
+          contributionPreferences: profile.contributionPreferences || [],
+        },
+        4
+      )
+    : [];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 space-y-8">
@@ -176,6 +217,102 @@ export default async function DashboardPage() {
             {profile?.skills?.length || 0} registered skills
           </div>
         </div>
+      </div>
+
+      {/* Recommended Issues Section */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h2 className="text-sm font-bold text-white font-mono uppercase tracking-wider">
+              Recommended Contributions For You
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Deterministic matching based on your skills, experience tier, and interests.
+            </p>
+          </div>
+          <Link
+            href="/issues"
+            className="text-xs font-mono text-sky-400 hover:text-sky-300 underline"
+          >
+            Explore All Issues →
+          </Link>
+        </div>
+
+        {recommended.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-800 p-8 text-center">
+            <p className="text-xs text-slate-400 font-mono">
+              No matching issues currently open.
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Browse the contribution marketplace or check official TechNexusOrg repositories on GitHub.
+            </p>
+            <Link
+              href="/issues"
+              className="mt-4 inline-block text-xs font-mono text-sky-400 hover:text-sky-300 underline"
+            >
+              Browse Issues Marketplace →
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {recommended.map(({ issue, score, matchReasons }) => (
+              <div
+                key={issue.id}
+                className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 flex flex-col justify-between space-y-3 hover:border-slate-700 transition-all"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono text-slate-400">
+                      {issue.githubRepo}
+                    </span>
+                    <span className="rounded bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 text-[10px] font-mono text-sky-300">
+                      Match Score: {score}
+                    </span>
+                  </div>
+
+                  <h3 className="text-sm font-bold text-white font-mono">
+                    <a
+                      href={issue.htmlUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-sky-300 transition-colors"
+                    >
+                      {issue.title}
+                    </a>
+                  </h3>
+
+                  {matchReasons.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      {matchReasons.map((reason, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono"
+                        >
+                          <span>✓</span>
+                          <span>{reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-slate-500">
+                    Difficulty: {issue.difficulty}
+                  </span>
+                  <a
+                    href={issue.htmlUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded bg-sky-500 px-3 py-1.5 text-xs font-mono font-semibold text-slate-950 hover:bg-sky-400 transition-colors"
+                  >
+                    View on GitHub →
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Verified Credentials Section */}
