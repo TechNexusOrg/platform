@@ -4,8 +4,10 @@ import Link from "next/link";
 import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
-import { evaluateProgression } from "@/lib/progression/rules";
+import { evaluateProgression, type ContributorLevel } from "@/lib/progression/rules";
 import { recommendIssues } from "@/lib/recommendations/engine";
+import { SyncContributionsButton } from "./SyncContributionsButton";
+import { ProgressionPath } from "./ProgressionPath";
 
 export const metadata = {
   title: "Contributor Dashboard — TechNexusOrg",
@@ -116,13 +118,18 @@ export default async function DashboardPage() {
             />
           )}
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="text-xl sm:text-2xl font-bold text-white font-mono">
                 {sessionUser.displayName || sessionUser.githubUsername}
               </h1>
               <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-xs font-mono text-sky-400 capitalize">
                 {sessionUser.level.replace("_", " ")}
               </span>
+              {sessionUser.foundingNumber && (
+                <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-mono font-bold text-amber-300">
+                  Founding Member #{String(sessionUser.foundingNumber).padStart(4, "0")}
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-400 mt-1 font-mono">
               @{sessionUser.githubUsername} • GitHub Verified Identity
@@ -131,6 +138,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <SyncContributionsButton />
           <Link
             href={`/people/${sessionUser.githubUsername}`}
             className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-sky-400 font-mono transition-colors"
@@ -155,43 +163,23 @@ export default async function DashboardPage() {
       </div>
 
       {/* Progression & Requirements */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-6">
+      <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-6 space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
           <div>
             <h2 className="text-sm font-bold text-white font-mono uppercase tracking-wider">
-              Progression Pipeline
+              Contributor Progression Pipeline
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Next milestone:{" "}
-              <span className="text-sky-400 font-mono capitalize">
-                {progression.nextLevel ? progression.nextLevel.replace("_", " ") : "Max Rank Reached"}
-              </span>
+              Verified proof of work drives automatic rank elevation. No fake counts or self-awarded titles.
             </p>
-          </div>
-          <div className="text-xs font-mono text-slate-500">
-            {mergedCount} merged PR(s) verified
           </div>
         </div>
 
-        <div className="mt-4">
-          <h3 className="text-xs font-semibold text-slate-300 font-mono uppercase">
-            Requirements for Next Level:
-          </h3>
-          {progression.requirementsForNextLevel.length > 0 ? (
-            <ul className="mt-2 space-y-1.5">
-              {progression.requirementsForNextLevel.map((req, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs text-slate-400">
-                  <span className="flex h-1.5 w-1.5 rounded-full bg-sky-400" />
-                  <span>{req}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-xs text-emerald-400 font-mono">
-              All criteria satisfied. Outstanding contribution history!
-            </p>
-          )}
-        </div>
+        <ProgressionPath
+          currentLevel={sessionUser.level as ContributorLevel}
+          progression={progression}
+          mergedCount={mergedCount}
+        />
       </div>
 
       {/* Stats Cards */}
