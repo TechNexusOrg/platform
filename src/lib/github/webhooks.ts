@@ -33,15 +33,13 @@ export function verifyWebhookSignature(payloadBody: string, signatureHeader: str
 }
 
 /**
- * Extracts referenced issue numbers from a pull request title and body using standard GitHub keywords.
+ * Extracts explicit closing keyword issue references from a pull request body.
  * Examples: "Fixes #12", "Closes https://github.com/TechNexusOrg/platform/issues/45", "Resolves #8"
  */
-export function extractIssueNumbersFromPrBody(body: string | null | undefined): number[] {
+export function extractClosingKeywordIssueNumbers(body: string | null | undefined): number[] {
   if (!body) return [];
 
   const issueNumbers = new Set<number>();
-
-  // Match keyword closing syntax: Fixes #123, Closes #45, Resolves #89
   const keywordRegex =
     /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+(?:#|https?:\/\/github\.com\/[^\/\s]+\/[^\/\s]+\/issues\/)(\d+)/gi;
 
@@ -53,8 +51,20 @@ export function extractIssueNumbersFromPrBody(body: string | null | undefined): 
     }
   }
 
+  return Array.from(issueNumbers);
+}
+
+/**
+ * Extracts referenced issue numbers from a pull request title and body using both closing keywords and hashtags.
+ */
+export function extractIssueNumbersFromPrBody(body: string | null | undefined): number[] {
+  if (!body) return [];
+
+  const issueNumbers = new Set<number>(extractClosingKeywordIssueNumbers(body));
+
   // Also match fallback "#<number>" when explicitly written
   const hashtagRegex = /#(\d+)/g;
+  let match: RegExpExecArray | null;
   while ((match = hashtagRegex.exec(body)) !== null) {
     const num = parseInt(match[1], 10);
     if (!isNaN(num)) {
@@ -152,11 +162,21 @@ export async function isWebhookDeliveryProcessed(
     .where(eq(schema.githubWebhookDeliveries.deliveryId, deliveryId))
     .limit(1);
 
-  return existing.length > 0 && existing[0].status === "completed";
+  return existing.length > 0 && existing[0].status === "processed";
+}
+
+export interface RecordDeliveryResult {
+  shouldProcess: boolean;
+  status: "received" | "processing" | "processed" | "ignored" | "error";
+  isRetry: boolean;
 }
 
 /**
- * Records an incoming webhook delivery with initial status.
+ * Atomically records an incoming webhook delivery with idempotent state machine:
+ * received -> processing -> processed
+ * received -> ignored
+ * processing -> error
+ * Returns whether processing should continue.
  */
 export async function recordWebhookDelivery(
   params: {
@@ -165,32 +185,82 @@ export async function recordWebhookDelivery(
     repository?: string;
   },
   database?: any
-) {
+): Promise<RecordDeliveryResult> {
   const db = database || (await getDb());
   const now = new Date();
 
+  // Check existing delivery state
   const existing = await db
-    .select({ id: schema.githubWebhookDeliveries.id })
+    .select({
+      id: schema.githubWebhookDeliveries.id,
+      status: schema.githubWebhookDeliveries.status,
+    })
     .from(schema.githubWebhookDeliveries)
     .where(eq(schema.githubWebhookDeliveries.deliveryId, params.deliveryId))
     .limit(1);
 
-  if (existing.length === 0) {
+  if (existing.length > 0) {
+    const current = existing[0];
+    if (current.status === "processed" || current.status === "ignored" || current.status === "processing") {
+      return {
+        shouldProcess: false,
+        status: current.status as any,
+        isRetry: false,
+      };
+    }
+
+    if (current.status === "error") {
+      // Retry allowed for previous failure
+      await db
+        .update(schema.githubWebhookDeliveries)
+        .set({
+          status: "processing",
+          error: null,
+          processedAt: null,
+        })
+        .where(eq(schema.githubWebhookDeliveries.deliveryId, params.deliveryId));
+
+      return {
+        shouldProcess: true,
+        status: "processing",
+        isRetry: true,
+      };
+    }
+  }
+
+  // Atomic insert attempt
+  try {
     await db.insert(schema.githubWebhookDeliveries).values({
       id: `whdel_${crypto.randomUUID()}`,
       deliveryId: params.deliveryId,
       eventType: params.eventType,
-      repository: params.repository || null,
+      repository: params.repository || "unknown",
       status: "processing",
       receivedAt: now,
     });
+
+    return {
+      shouldProcess: true,
+      status: "processing",
+      isRetry: false,
+    };
+  } catch (err: any) {
+    // Concurrent insert collision on unique deliveryId
+    if (err.message?.includes("delivery_id") || err.code === "23505") {
+      return {
+        shouldProcess: false,
+        status: "processing",
+        isRetry: false,
+      };
+    }
+    throw err;
   }
 }
 
 /**
- * Marks a webhook delivery as completed.
+ * Marks a webhook delivery as successfully processed.
  */
-export async function markWebhookDeliveryCompleted(
+export async function markWebhookDeliveryProcessed(
   deliveryId: string,
   database?: any
 ) {
@@ -198,16 +268,39 @@ export async function markWebhookDeliveryCompleted(
   await db
     .update(schema.githubWebhookDeliveries)
     .set({
-      status: "completed",
+      status: "processed",
+      error: null,
+      processedAt: new Date(),
+    })
+    .where(eq(schema.githubWebhookDeliveries.deliveryId, deliveryId));
+}
+
+// Backward-compatible alias
+export const markWebhookDeliveryCompleted = markWebhookDeliveryProcessed;
+
+/**
+ * Marks a webhook delivery as ignored (e.g. ping, unsupported events, untrusted repos).
+ */
+export async function markWebhookDeliveryIgnored(
+  deliveryId: string,
+  reason?: string,
+  database?: any
+) {
+  const db = database || (await getDb());
+  await db
+    .update(schema.githubWebhookDeliveries)
+    .set({
+      status: "ignored",
+      error: reason || null,
       processedAt: new Date(),
     })
     .where(eq(schema.githubWebhookDeliveries.deliveryId, deliveryId));
 }
 
 /**
- * Marks a webhook delivery as failed.
+ * Marks a webhook delivery as error.
  */
-export async function markWebhookDeliveryFailed(
+export async function markWebhookDeliveryError(
   deliveryId: string,
   error: string,
   database?: any
@@ -216,17 +309,21 @@ export async function markWebhookDeliveryFailed(
   await db
     .update(schema.githubWebhookDeliveries)
     .set({
-      status: "failed",
-      error,
+      status: "error",
+      error: error.slice(0, 1000),
       processedAt: new Date(),
     })
     .where(eq(schema.githubWebhookDeliveries.deliveryId, deliveryId));
 }
 
+// Backward-compatible alias
+export const markWebhookDeliveryFailed = markWebhookDeliveryError;
+
 /**
  * Handles pull_request webhook events:
  * - Upserts PR record into `pull_requests`
- * - Links PR to referenced issues and active claims
+ * - Links PR to referenced issues and active claims using priority association
+ * - Enforces repository approval trust boundary
  * - On merge: auto-completes claims, closes issues, records verified contribution, updates progression
  */
 export async function handlePullRequestWebhook(
@@ -238,7 +335,7 @@ export async function handlePullRequestWebhook(
   const repoFullName = payload.repository.full_name;
   const now = new Date();
 
-  // 1. Resolve or create project with repository trust boundary enforcement
+  // 1. Resolve project and enforce approval trust boundary
   const matchingProjects = await db
     .select()
     .from(schema.projects)
@@ -258,29 +355,34 @@ export async function handlePullRequestWebhook(
       };
     }
 
+    // New organization repository discovered: default to unapproved and contribution-disabled
     projectId = `proj_${crypto.randomUUID()}`;
     await db.insert(schema.projects).values({
       id: projectId,
       name: payload.repository.name,
       slug: payload.repository.name.toLowerCase(),
       githubRepo: repoFullName,
-      description: `Official repository: ${repoFullName}`,
+      description: `Discovered repository: ${repoFullName}`,
       primaryLanguage: "TypeScript",
       languages: [],
-      isOfficial: true,
-      contributionEnabled: true,
+      isOfficial: false,
+      contributionEnabled: false,
+      firstPrEnabled: false,
+      approvedAt: null,
     });
-    isContributionEligible = true;
+    isContributionEligible = false;
   } else {
     const project = matchingProjects[0];
     projectId = project.id;
-    isContributionEligible = project.isOfficial && project.contributionEnabled;
+    // Strictly require official, approved, and contribution enabled
+    isContributionEligible =
+      project.isOfficial && project.contributionEnabled && !!project.approvedAt;
   }
 
   if (!isContributionEligible) {
     return {
       handled: false,
-      reason: "Repository is outside official contribution scope or contributions are disabled.",
+      reason: "Repository is unapproved or contributions are disabled.",
       prId: null,
     };
   }
@@ -294,29 +396,94 @@ export async function handlePullRequestWebhook(
 
   const registeredUser = matchingUsers.length > 0 ? matchingUsers[0] : null;
 
-  // 3. Extract and match referenced issues
-  const fullText = `${pr.title} ${pr.body || ""}`;
-  const issueNumbers = extractIssueNumbersFromPrBody(fullText);
-
+  // 3. Robust Issue ↔ PR Linking Priority:
+  // Priority 1: Contributor has an existing active claim on an issue in this project
+  // Priority 2: Explicit closing keywords (Fixes #123, Closes #123, Resolves #123)
+  // Priority 3: Exact hashtag reference (#123)
+  // If ambiguous (multiple conflicting references), do not silently link: mark "ambiguous"
   let matchedIssueId: string | null = null;
-  if (issueNumbers.length > 0) {
-    // Check if any referenced issue exists for this project in our database
-    for (const num of issueNumbers) {
+  let matchedClaimId: string | null = null;
+  let associationStatus: "claimed" | "explicit_reference" | "inferred" | "ambiguous" | "unlinked" = "unlinked";
+  let associationSource: string | null = null;
+
+  const fullText = `${pr.title} ${pr.body || ""}`;
+  const closingKeywordNumbers = extractClosingKeywordIssueNumbers(fullText);
+  const allReferencedNumbers = extractIssueNumbersFromPrBody(fullText);
+
+  // Check Priority 1: Active claim by registered PR author
+  if (registeredUser) {
+    const activeClaims = await db
+      .select({
+        claimId: schema.issueClaims.id,
+        issueId: schema.issueClaims.issueId,
+        githubIssueNumber: schema.issues.githubIssueNumber,
+      })
+      .from(schema.issueClaims)
+      .innerJoin(schema.issues, eq(schema.issueClaims.issueId, schema.issues.id))
+      .where(
+        and(
+          eq(schema.issueClaims.userId, registeredUser.id),
+          eq(schema.issueClaims.status, "active"),
+          eq(schema.issues.projectId, projectId)
+        )
+      );
+
+    if (activeClaims.length === 1) {
+      matchedIssueId = activeClaims[0].issueId;
+      matchedClaimId = activeClaims[0].claimId;
+      associationStatus = "claimed";
+      associationSource = `Active claim by contributor on issue #${activeClaims[0].githubIssueNumber}`;
+    }
+  }
+
+  // Check Priority 2: Explicit closing keyword (Fixes #123)
+  if (!matchedIssueId && closingKeywordNumbers.length > 0) {
+    if (closingKeywordNumbers.length === 1) {
       const issues = await db
-        .select({ id: schema.issues.id })
+        .select({ id: schema.issues.id, number: schema.issues.githubIssueNumber })
         .from(schema.issues)
         .where(
           and(
             eq(schema.issues.projectId, projectId),
-            eq(schema.issues.githubIssueNumber, num)
+            eq(schema.issues.githubIssueNumber, closingKeywordNumbers[0])
           )
         )
         .limit(1);
 
       if (issues.length > 0) {
         matchedIssueId = issues[0].id;
-        break;
+        associationStatus = "explicit_reference";
+        associationSource = `Explicit closing keyword Fixes/Closes #${issues[0].number}`;
       }
+    } else {
+      // Multiple conflicting closing keywords
+      associationStatus = "ambiguous";
+      associationSource = `Multiple explicit closing keywords: #${closingKeywordNumbers.join(", #")}`;
+    }
+  }
+
+  // Check Priority 3: Fallback hashtag reference
+  if (!matchedIssueId && associationStatus !== "ambiguous" && allReferencedNumbers.length > 0) {
+    if (allReferencedNumbers.length === 1) {
+      const issues = await db
+        .select({ id: schema.issues.id, number: schema.issues.githubIssueNumber })
+        .from(schema.issues)
+        .where(
+          and(
+            eq(schema.issues.projectId, projectId),
+            eq(schema.issues.githubIssueNumber, allReferencedNumbers[0])
+          )
+        )
+        .limit(1);
+
+      if (issues.length > 0) {
+        matchedIssueId = issues[0].id;
+        associationStatus = "inferred";
+        associationSource = `Inferred hashtag reference #${issues[0].number}`;
+      }
+    } else {
+      associationStatus = "ambiguous";
+      associationSource = `Multiple ambiguous issue references: #${allReferencedNumbers.join(", #")}`;
     }
   }
 
@@ -346,6 +513,9 @@ export async function handlePullRequestWebhook(
         draft: pr.draft || false,
         mergeCommitSha: pr.merge_commit_sha || null,
         issueId: matchedIssueId || existingPrs[0].issueId,
+        claimId: matchedClaimId || existingPrs[0].claimId,
+        associationStatus: matchedIssueId ? associationStatus : existingPrs[0].associationStatus,
+        associationSource: associationSource || existingPrs[0].associationSource,
         mergedAt: pr.merged_at ? new Date(pr.merged_at) : null,
         closedAt: pr.closed_at ? new Date(pr.closed_at) : null,
         updatedAt: now,
@@ -358,6 +528,9 @@ export async function handlePullRequestWebhook(
       userId: registeredUser?.id || null,
       projectId,
       issueId: matchedIssueId,
+      claimId: matchedClaimId,
+      associationStatus,
+      associationSource,
       githubPrId: pr.id,
       githubPrNumber: pr.number,
       title: pr.title,
@@ -377,18 +550,9 @@ export async function handlePullRequestWebhook(
   let progressionResult: any | undefined;
 
   if (payload.action === "closed" && pr.merged) {
-    // A. If an issue was linked, complete the active claim and close the issue
+    // A. If an issue was linked, complete active claim and close issue
     if (matchedIssueId) {
-      // Mark issue closed
-      await db
-        .update(schema.issues)
-        .set({
-          state: "closed",
-          updatedAt: now,
-        })
-        .where(eq(schema.issues.id, matchedIssueId));
-
-      // Mark active claim completed
+      // Complete active claim on this issue
       await db
         .update(schema.issueClaims)
         .set({
@@ -401,58 +565,76 @@ export async function handlePullRequestWebhook(
             eq(schema.issueClaims.status, "active")
           )
         );
+
+      // Mark issue closed
+      await db
+        .update(schema.issues)
+        .set({
+          state: "closed",
+          updatedAt: now,
+        })
+        .where(eq(schema.issues.id, matchedIssueId));
     }
 
-    // B. If the author is a registered contributor, record verified contribution & evaluate progression
+    // B. If user is registered on the platform, record verified contribution
     if (registeredUser) {
+      // Check existing contribution record
       const existingContribs = await db
-        .select()
-        .from(schema.contributions)
-        .where(
-          and(
-            eq(schema.contributions.userId, registeredUser.id),
-            eq(schema.contributions.state, "merged")
-          )
-        );
-
-      const isFirstPr = existingContribs.length === 0;
-      contributionId = `contrib_${crypto.randomUUID()}`;
-      const mergedDate = pr.merged_at ? new Date(pr.merged_at) : now;
-
-      // Upsert contribution by prUrl
-      const existingByUrl = await db
         .select()
         .from(schema.contributions)
         .where(eq(schema.contributions.prUrl, pr.html_url))
         .limit(1);
 
-      if (existingByUrl.length === 0) {
+      if (existingContribs.length === 0) {
+        // Count previous merged PRs to identify first PR
+        const priorMerged = await db
+          .select({ id: schema.contributions.id })
+          .from(schema.contributions)
+          .where(
+            and(
+              eq(schema.contributions.userId, registeredUser.id),
+              eq(schema.contributions.state, "merged")
+            )
+          );
+
+        const isFirstPr = priorMerged.length === 0;
+        contributionId = `contrib_${crypto.randomUUID()}`;
+
         await db.insert(schema.contributions).values({
           id: contributionId,
           userId: registeredUser.id,
           projectId,
           issueId: matchedIssueId,
+          claimId: matchedClaimId,
           githubPrNumber: pr.number,
           prTitle: pr.title,
           prUrl: pr.html_url,
           state: "merged",
           isFirstPr,
-          mergedAt: mergedDate,
+          mergedAt: pr.merged_at ? new Date(pr.merged_at) : now,
           verifiedAt: now,
-          verificationSource: "github_webhook",
+          verificationSource: "github_webhook_merge",
+          createdAt: now,
+          updatedAt: now,
         });
 
-        progressionResult = await processProgressionOnContribution(db, {
-          userId: registeredUser.id,
-          contributionId,
-          githubUsername: registeredUser.githubUsername,
-          repoFullName,
-          prNumber: pr.number,
-          prUrl: pr.html_url,
-          prTitle: pr.title,
-          mergedAt: mergedDate,
-          isFirstPr,
-        });
+        // Trigger progression evaluation and verifiable credential minting
+        progressionResult = await processProgressionOnContribution(
+          db,
+          {
+            userId: registeredUser.id,
+            contributionId,
+            githubUsername: registeredUser.githubUsername,
+            repoFullName,
+            prNumber: pr.number,
+            prUrl: pr.html_url,
+            prTitle: pr.title,
+            mergedAt: pr.merged_at ? new Date(pr.merged_at) : now,
+            isFirstPr,
+          }
+        );
+      } else {
+        contributionId = existingContribs[0].id;
       }
     }
   }
@@ -461,16 +643,16 @@ export async function handlePullRequestWebhook(
     handled: true,
     prId: prRecordId,
     linkedIssueId: matchedIssueId,
-    registeredAuthor: Boolean(registeredUser),
+    associationStatus,
+    associationSource,
     contributionId,
-    progressionResult,
+    progression: progressionResult,
   };
 }
 
 /**
  * Handles pull_request_review webhook events:
- * - Upserts review into `pull_request_reviews`
- * - Updates PR state if approved / changes_requested
+ * Ingests reviews submitted by reviewers and updates PR state.
  */
 export async function handlePullRequestReviewWebhook(
   payload: WebhookPullRequestReviewEvent,
@@ -478,58 +660,42 @@ export async function handlePullRequestReviewWebhook(
 ) {
   const db = database || (await getDb());
   const review = payload.review;
+  const pr = payload.pull_request;
   const now = new Date();
 
-  // 1. Resolve PR record in database
+  // Find PR in our database
   const matchingPrs = await db
     .select()
     .from(schema.pullRequests)
-    .where(eq(schema.pullRequests.url, payload.pull_request.html_url))
+    .where(eq(schema.pullRequests.url, pr.html_url))
     .limit(1);
 
-  let prId: string;
-  if (matchingPrs.length > 0) {
-    prId = matchingPrs[0].id;
-  } else {
-    // If PR doesn't exist yet, resolve project and insert PR skeleton
-    const repoFullName = payload.repository.full_name;
-    const matchingProjects = await db
-      .select({ id: schema.projects.id })
-      .from(schema.projects)
-      .where(eq(schema.projects.githubRepo, repoFullName))
-      .limit(1);
-
-    const projectId =
-      matchingProjects.length > 0 ? matchingProjects[0].id : `proj_${crypto.randomUUID()}`;
-
-    prId = `pr_${crypto.randomUUID()}`;
-    await db.insert(schema.pullRequests).values({
-      id: prId,
-      projectId,
-      githubPrId: payload.pull_request.id,
-      githubPrNumber: payload.pull_request.number,
-      title: payload.pull_request.title,
-      url: payload.pull_request.html_url,
-      state: "open",
-    });
+  if (matchingPrs.length === 0) {
+    return {
+      handled: false,
+      reason: "Pull request not tracked in platform database.",
+    };
   }
 
-  // 2. Map review state
-  const rawState = review.state.toLowerCase();
+  const prRecord = matchingPrs[0];
+
+  // Map review state
+  const state = review.state.toLowerCase();
   let reviewState: "approved" | "changes_requested" | "commented" | "dismissed" = "commented";
-  if (rawState === "approved") {
+
+  if (state === "approved") {
     reviewState = "approved";
-  } else if (rawState === "changes_requested") {
+  } else if (state === "changes_requested") {
     reviewState = "changes_requested";
-  } else if (rawState === "dismissed") {
+  } else if (state === "dismissed") {
     reviewState = "dismissed";
   }
 
-  // 3. Upsert into pull_request_reviews
-  const reviewId = `rev_${crypto.randomUUID()}`;
+  // Insert review record
+  const reviewId = `prrev_${crypto.randomUUID()}`;
   await db.insert(schema.pullRequestReviews).values({
     id: reviewId,
-    pullRequestId: prId,
+    pullRequestId: prRecord.id,
     reviewerGithubId: review.user.id,
     reviewerUsername: review.user.login,
     reviewState,
@@ -539,21 +705,25 @@ export async function handlePullRequestReviewWebhook(
     createdAt: now,
   });
 
-  // 4. Update PR state if approved / changes_requested
-  if (reviewState === "approved" || reviewState === "changes_requested") {
-    await db
-      .update(schema.pullRequests)
-      .set({
-        state: reviewState,
-        updatedAt: now,
-      })
-      .where(eq(schema.pullRequests.id, prId));
+  // Update PR overall state if open and non-draft
+  if (prRecord.state !== "merged" && prRecord.state !== "closed") {
+    if (reviewState === "approved") {
+      await db
+        .update(schema.pullRequests)
+        .set({ state: "approved", updatedAt: now })
+        .where(eq(schema.pullRequests.id, prRecord.id));
+    } else if (reviewState === "changes_requested") {
+      await db
+        .update(schema.pullRequests)
+        .set({ state: "changes_requested", updatedAt: now })
+        .where(eq(schema.pullRequests.id, prRecord.id));
+    }
   }
 
   return {
     handled: true,
     reviewId,
-    prId,
+    pullRequestId: prRecord.id,
     reviewState,
   };
 }

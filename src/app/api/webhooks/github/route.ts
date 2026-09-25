@@ -3,10 +3,10 @@ import {
   verifyWebhookSignature,
   handlePullRequestWebhook,
   handlePullRequestReviewWebhook,
-  isWebhookDeliveryProcessed,
   recordWebhookDelivery,
-  markWebhookDeliveryCompleted,
-  markWebhookDeliveryFailed,
+  markWebhookDeliveryProcessed,
+  markWebhookDeliveryIgnored,
+  markWebhookDeliveryError,
   type WebhookPullRequestEvent,
   type WebhookPullRequestReviewEvent,
 } from "@/lib/github/webhooks";
@@ -22,32 +22,47 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  if (event === "ping") {
-    return NextResponse.json({ message: "PONG" });
+  let repoName: string | undefined;
+  try {
+    const parsed = JSON.parse(rawBody);
+    repoName = parsed.repository?.full_name;
+  } catch {
+    // raw payload may be empty or invalid json
   }
 
-  // Idempotency: Ignore duplicate webhook deliveries
+  // Idempotency state machine check & record
   if (deliveryId) {
-    const alreadyProcessed = await isWebhookDeliveryProcessed(deliveryId);
-    if (alreadyProcessed) {
-      return NextResponse.json({
-        message: "Duplicate webhook delivery ignored",
-        deliveryId,
-      });
-    }
-
-    let repoName: string | undefined;
-    try {
-      const parsed = JSON.parse(rawBody);
-      repoName = parsed.repository?.full_name;
-    } catch {
-      // ignore
-    }
-
-    await recordWebhookDelivery({
+    const delivery = await recordWebhookDelivery({
       deliveryId,
       eventType: event || "unknown",
       repository: repoName,
+    });
+
+    if (!delivery.shouldProcess) {
+      return NextResponse.json({
+        message: "Duplicate or in-flight delivery ignored",
+        deliveryId,
+        status: delivery.status,
+      });
+    }
+  }
+
+  // Handle ping event
+  if (event === "ping") {
+    if (deliveryId) {
+      await markWebhookDeliveryIgnored(deliveryId, "ping");
+    }
+    return NextResponse.json({ message: "PONG" });
+  }
+
+  // Unsupported events become 'ignored'
+  if (event !== "pull_request" && event !== "pull_request_review") {
+    if (deliveryId) {
+      await markWebhookDeliveryIgnored(deliveryId, `Unsupported event: ${event}`);
+    }
+    return NextResponse.json({
+      ignored: true,
+      reason: `Unsupported event: ${event}`,
     });
   }
 
@@ -63,14 +78,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (deliveryId) {
-      await markWebhookDeliveryCompleted(deliveryId);
+      if (result.handled === false) {
+        await markWebhookDeliveryIgnored(deliveryId, result.reason || "unhandled");
+      } else {
+        await markWebhookDeliveryProcessed(deliveryId);
+      }
     }
 
     return NextResponse.json(result);
   } catch (err: any) {
     console.error("Webhook processing error:", err);
     if (deliveryId) {
-      await markWebhookDeliveryFailed(deliveryId, err.message);
+      await markWebhookDeliveryError(deliveryId, err.message);
     }
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

@@ -39,7 +39,7 @@ Verifiable Proof of Work Minted (/verify/[id])
 │   │   │   ├── auth/              # GitHub OAuth & session lifecycle
 │   │   │   ├── health/            # System health monitor (/api/health)
 │   │   │   ├── onboarding/        # Contributor profile configuration
-│   │   │   └── webhooks/github/   # Cryptographic webhook event ingest
+│   │   │   └── webhooks/github/   # HMAC-verified webhook event ingest
 │   │   ├── dashboard/             # Authenticated contributor cockpit
 │   │   ├── first-pr/              # #FirstPR initiative portal
 │   │   ├── founding-1000/         # Live Founding 1,000 registry

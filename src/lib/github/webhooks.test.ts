@@ -2,11 +2,14 @@ import { describe, it, expect, beforeAll } from "vitest";
 import {
   verifyWebhookSignature,
   extractIssueNumbersFromPrBody,
+  extractClosingKeywordIssueNumbers,
   handlePullRequestWebhook,
   handlePullRequestReviewWebhook,
   recordWebhookDelivery,
   isWebhookDeliveryProcessed,
-  markWebhookDeliveryCompleted,
+  markWebhookDeliveryProcessed,
+  markWebhookDeliveryIgnored,
+  markWebhookDeliveryError,
   type WebhookPullRequestEvent,
   type WebhookPullRequestReviewEvent,
 } from "./webhooks";
@@ -19,6 +22,7 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
   const secret = process.env.GITHUB_WEBHOOK_SECRET || "dev_webhook_secret_key";
   const userId = "usr_wh_test_contributor";
   const projectId = "proj_wh_test_repo";
+  const unapprovedProjectId = "proj_wh_test_unapproved";
   const issueId = "iss_wh_test_issue";
   const claimId = "claim_wh_test_claim";
 
@@ -34,11 +38,11 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
       githubUsername: "contributor_cathy",
       displayName: "Cathy Contributor",
       role: "contributor",
-      level: "level_1",
+      level: "explorer",
       isOnboarded: true,
     });
 
-    // 2. Seed project
+    // 2. Seed approved official project
     await db.insert(schema.projects).values({
       id: projectId,
       name: "awesome-sdk",
@@ -46,10 +50,27 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
       githubRepo: "TechNexusOrg/awesome-sdk",
       description: "Official test repository for webhook lifecycle",
       primaryLanguage: "TypeScript",
+      isOfficial: true,
       contributionEnabled: true,
+      firstPrEnabled: true,
+      approvedAt: new Date(),
     });
 
-    // 3. Seed issue
+    // Seed unapproved project
+    await db.insert(schema.projects).values({
+      id: unapprovedProjectId,
+      name: "unapproved-sandbox",
+      slug: "unapproved-sandbox",
+      githubRepo: "TechNexusOrg/unapproved-sandbox",
+      description: "Unapproved repository sandbox",
+      primaryLanguage: "TypeScript",
+      isOfficial: false,
+      contributionEnabled: false,
+      firstPrEnabled: false,
+      approvedAt: null,
+    });
+
+    // 3. Seed issue in approved project
     await db.insert(schema.issues).values({
       id: issueId,
       projectId,
@@ -105,13 +126,13 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
   describe("Issue Number Extraction from PR Body", () => {
     it("extracts issue numbers from standard closing keywords", () => {
       const body1 = "This PR implements exponential backoff. Fixes #42 cleanly.";
-      expect(extractIssueNumbersFromPrBody(body1)).toEqual([42]);
+      expect(extractClosingKeywordIssueNumbers(body1)).toEqual([42]);
 
       const body2 = "Closes #15 and also resolves #89";
-      expect(extractIssueNumbersFromPrBody(body2)).toEqual([15, 89]);
+      expect(extractClosingKeywordIssueNumbers(body2)).toEqual([15, 89]);
 
       const body3 = "Resolves https://github.com/TechNexusOrg/platform/issues/99";
-      expect(extractIssueNumbersFromPrBody(body3)).toEqual([99]);
+      expect(extractClosingKeywordIssueNumbers(body3)).toEqual([99]);
     });
 
     it("returns empty array for text without issue references", () => {
@@ -122,7 +143,6 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
   });
 
   describe("Pull Request Lifecycle & Issue Claim Auto-Completion", () => {
-    const prNumber = 105;
     const prUrl = "https://github.com/TechNexusOrg/awesome-sdk/pull/105";
 
     it("ingests opened PR, links to referenced issue and registered user", async () => {
@@ -131,9 +151,9 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
         action: "opened",
         pull_request: {
           id: 55001,
-          number: prNumber,
+          number: 105,
           title: "feat: add rate limiting retry",
-          body: "Implements retry strategy. Fixes #42",
+          body: "Implemented retry loop with jitter. Fixes #42",
           html_url: prUrl,
           state: "open",
           draft: false,
@@ -170,8 +190,9 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
       const result = await handlePullRequestWebhook(openEvent, db);
       expect(result.handled).toBe(true);
       expect(result.linkedIssueId).toBe(issueId);
+      expect(result.associationStatus).toBe("claimed");
 
-      // Verify record in pull_requests table
+      // Verify PR stored in pull_requests table with claimId
       const [storedPr] = await db
         .select()
         .from(schema.pullRequests)
@@ -180,8 +201,8 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
 
       expect(storedPr).toBeDefined();
       expect(storedPr.userId).toBe(userId);
-      expect(storedPr.issueId).toBe(issueId);
       expect(storedPr.state).toBe("open");
+      expect(storedPr.claimId).toBe(claimId);
     });
 
     it("ingests merged PR, completes active claim, closes issue, and awards contribution", async () => {
@@ -190,15 +211,15 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
         action: "closed",
         pull_request: {
           id: 55001,
-          number: prNumber,
+          number: 105,
           title: "feat: add rate limiting retry",
-          body: "Implements retry strategy. Fixes #42",
+          body: "Implemented retry loop with jitter. Fixes #42",
           html_url: prUrl,
           state: "closed",
           draft: false,
           merged: true,
           merged_at: new Date().toISOString(),
-          merge_commit_sha: "abcd1234efgh5678",
+          merge_commit_sha: "c0ffee1234567890abcdef",
           user: {
             id: 998877,
             login: "contributor_cathy",
@@ -231,47 +252,43 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
       expect(result.handled).toBe(true);
       expect(result.contributionId).toBeDefined();
 
-      // 1. Verify PR state updated to 'merged'
-      const [updatedPr] = await db
-        .select()
-        .from(schema.pullRequests)
-        .where(eq(schema.pullRequests.url, prUrl))
-        .limit(1);
-      expect(updatedPr.state).toBe("merged");
-
-      // 2. Verify issue state updated to 'closed'
-      const [closedIssue] = await db
-        .select()
-        .from(schema.issues)
-        .where(eq(schema.issues.id, issueId))
-        .limit(1);
-      expect(closedIssue.state).toBe("closed");
-
-      // 3. Verify issue claim updated to 'completed'
-      const [completedClaim] = await db
+      // Check active claim status transitioned to completed
+      const [updatedClaim] = await db
         .select()
         .from(schema.issueClaims)
         .where(eq(schema.issueClaims.id, claimId))
         .limit(1);
-      expect(completedClaim.status).toBe("completed");
 
-      // 4. Verify contribution recorded
-      const [contrib] = await db
+      expect(updatedClaim.status).toBe("completed");
+
+      // Check issue marked closed
+      const [updatedIssue] = await db
+        .select()
+        .from(schema.issues)
+        .where(eq(schema.issues.id, issueId))
+        .limit(1);
+
+      expect(updatedIssue.state).toBe("closed");
+
+      // Check verified contribution created
+      const [contribution] = await db
         .select()
         .from(schema.contributions)
         .where(eq(schema.contributions.prUrl, prUrl))
         .limit(1);
-      expect(contrib).toBeDefined();
-      expect(contrib.state).toBe("merged");
-      expect(contrib.issueId).toBe(issueId);
+
+      expect(contribution).toBeDefined();
+      expect(contribution.state).toBe("merged");
+      expect(contribution.isFirstPr).toBe(true);
+      expect(contribution.verifiedAt).not.toBeNull();
     });
   });
 
   describe("Pull Request Code Reviews", () => {
+    const prUrl = "https://github.com/TechNexusOrg/awesome-sdk/pull/105";
+
     it("ingests approved review and updates PR state", async () => {
       const db = await getDb();
-      const prUrl = "https://github.com/TechNexusOrg/awesome-sdk/pull/105";
-
       const reviewEvent: WebhookPullRequestReviewEvent = {
         action: "submitted",
         review: {
@@ -320,18 +337,18 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
     });
   });
 
-  describe("Webhook Delivery Idempotency Tracking", () => {
-    const testDeliveryId = "delivery_test_unique_guid_123";
+  describe("Webhook Delivery Idempotency State Machine", () => {
+    const testDeliveryId = "delivery_test_state_machine_01";
+    const retryDeliveryId = "delivery_test_retry_02";
 
-    it("records delivery and marks it completed, detecting duplicates", async () => {
+    it("transitions received -> processing -> processed, ignoring duplicate deliveries", async () => {
       const db = await getDb();
 
       // Check initial state
-      const initialProcessed = await isWebhookDeliveryProcessed(testDeliveryId, db);
-      expect(initialProcessed).toBe(false);
+      expect(await isWebhookDeliveryProcessed(testDeliveryId, db)).toBe(false);
 
-      // Record incoming delivery
-      await recordWebhookDelivery(
+      // First delivery: shouldProcess is true
+      const first = await recordWebhookDelivery(
         {
           deliveryId: testDeliveryId,
           eventType: "pull_request",
@@ -339,17 +356,116 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
         },
         db
       );
+      expect(first.shouldProcess).toBe(true);
+      expect(first.status).toBe("processing");
 
-      // Mark completed
-      await markWebhookDeliveryCompleted(testDeliveryId, db);
+      // Mark processed
+      await markWebhookDeliveryProcessed(testDeliveryId, db);
+      expect(await isWebhookDeliveryProcessed(testDeliveryId, db)).toBe(true);
 
-      // Now it should be detected as processed
-      const isDone = await isWebhookDeliveryProcessed(testDeliveryId, db);
-      expect(isDone).toBe(true);
+      // Duplicate delivery attempt: shouldProcess is false
+      const duplicate = await recordWebhookDelivery(
+        {
+          deliveryId: testDeliveryId,
+          eventType: "pull_request",
+          repository: "TechNexusOrg/awesome-sdk",
+        },
+        db
+      );
+      expect(duplicate.shouldProcess).toBe(false);
+      expect(duplicate.status).toBe("processed");
+    });
+
+    it("supports retry on failed delivery", async () => {
+      const db = await getDb();
+
+      // Initial delivery fails
+      await recordWebhookDelivery(
+        {
+          deliveryId: retryDeliveryId,
+          eventType: "pull_request",
+          repository: "TechNexusOrg/awesome-sdk",
+        },
+        db
+      );
+      await markWebhookDeliveryError(retryDeliveryId, "Database timeout error", db);
+
+      // Verify error state
+      const [failedRecord] = await db
+        .select()
+        .from(schema.githubWebhookDeliveries)
+        .where(eq(schema.githubWebhookDeliveries.deliveryId, retryDeliveryId));
+      expect(failedRecord.status).toBe("error");
+      expect(failedRecord.error).toBe("Database timeout error");
+
+      // Retry delivery: shouldProcess is true, isRetry is true
+      const retry = await recordWebhookDelivery(
+        {
+          deliveryId: retryDeliveryId,
+          eventType: "pull_request",
+          repository: "TechNexusOrg/awesome-sdk",
+        },
+        db
+      );
+      expect(retry.shouldProcess).toBe(true);
+      expect(retry.isRetry).toBe(true);
+      expect(retry.status).toBe("processing");
+    });
+
+    it("marks unsupported events as ignored", async () => {
+      const db = await getDb();
+      const ignoredDeliveryId = "delivery_unsupported_03";
+
+      await recordWebhookDelivery(
+        {
+          deliveryId: ignoredDeliveryId,
+          eventType: "star",
+          repository: "TechNexusOrg/awesome-sdk",
+        },
+        db
+      );
+
+      await markWebhookDeliveryIgnored(ignoredDeliveryId, "Unsupported event: star", db);
+
+      const [record] = await db
+        .select()
+        .from(schema.githubWebhookDeliveries)
+        .where(eq(schema.githubWebhookDeliveries.deliveryId, ignoredDeliveryId));
+
+      expect(record.status).toBe("ignored");
+      expect(record.error).toBe("Unsupported event: star");
+    });
+
+    it("handles concurrent duplicate deliveries safely", async () => {
+      const db = await getDb();
+      const concurrentDeliveryId = `delivery_concurrent_${Date.now()}`;
+
+      const [res1, res2] = await Promise.all([
+        recordWebhookDelivery(
+          {
+            deliveryId: concurrentDeliveryId,
+            eventType: "pull_request",
+            repository: "TechNexusOrg/awesome-sdk",
+          },
+          db
+        ),
+        recordWebhookDelivery(
+          {
+            deliveryId: concurrentDeliveryId,
+            eventType: "pull_request",
+            repository: "TechNexusOrg/awesome-sdk",
+          },
+          db
+        ),
+      ]);
+
+      // Exactly one should process, the other should be rejected
+      const shouldProcessCount = [res1.shouldProcess, res2.shouldProcess].filter(Boolean).length;
+      expect(shouldProcessCount).toBe(1);
     });
   });
 
-  describe("Repository Trust Boundary", () => {
+  describe("Repository Trust Boundary & Approval", () => {
     it("rejects PR events originating from unauthorized third-party repositories", async () => {
       const db = await getDb();
       const maliciousEvent: WebhookPullRequestEvent = {
@@ -361,6 +477,7 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
           body: "Trying to claim contribution outside org",
           html_url: "https://github.com/RandomSpammer/fake-repo/pull/1",
           state: "open",
+          draft: false,
           merged: false,
           merged_at: null,
           user: {
@@ -395,6 +512,53 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
       expect(result.handled).toBe(false);
       expect(result.reason).toMatch(/outside official organization trust boundary/i);
     });
+
+    it("rejects contribution processing on unapproved TechNexusOrg repositories", async () => {
+      const db = await getDb();
+      const unapprovedEvent: WebhookPullRequestEvent = {
+        action: "closed",
+        pull_request: {
+          id: 77001,
+          number: 2,
+          title: "PR in unapproved repository",
+          body: "Merged PR in unapproved repo",
+          html_url: "https://github.com/TechNexusOrg/unapproved-sandbox/pull/2",
+          state: "closed",
+          draft: false,
+          merged: true,
+          merged_at: new Date().toISOString(),
+          user: {
+            id: 998877,
+            login: "contributor_cathy",
+            avatar_url: "https://avatars.githubusercontent.com/u/998877",
+          },
+          base: {
+            repo: {
+              id: 44001,
+              name: "unapproved-sandbox",
+              full_name: "TechNexusOrg/unapproved-sandbox",
+              html_url: "https://github.com/TechNexusOrg/unapproved-sandbox",
+            },
+          },
+        },
+        repository: {
+          id: 44001,
+          name: "unapproved-sandbox",
+          full_name: "TechNexusOrg/unapproved-sandbox",
+          owner: {
+            login: "TechNexusOrg",
+          },
+        },
+        sender: {
+          id: 998877,
+          login: "contributor_cathy",
+        },
+      };
+
+      const result = await handlePullRequestWebhook(unapprovedEvent, db);
+      expect(result.handled).toBe(false);
+      expect(result.reason).toMatch(/unapproved or contributions are disabled/i);
+      expect(result.contributionId).toBeUndefined();
+    });
   });
 });
-

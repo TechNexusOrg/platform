@@ -241,17 +241,20 @@ export default async function ContributorPassportPage({
         </div>
       </div>
 
-      {/* Demonstrated Skills */}
+      {/* Self-Reported Skills & Interests */}
       {profile?.skills && profile.skills.length > 0 && (
         <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-6 space-y-3">
-          <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-            Demonstrated Skills & Technologies
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+              Self-Reported Skills & Technologies
+            </h2>
+            <span className="text-[10px] font-mono text-slate-500">Declared during onboarding</span>
+          </div>
           <div className="flex flex-wrap gap-2">
             {profile.skills.map((skill) => (
               <span
                 key={skill}
-                className="rounded-md border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-xs font-mono text-sky-300"
+                className="rounded-md border border-slate-700/60 bg-slate-800/60 px-3 py-1 text-xs font-mono text-slate-300"
               >
                 {skill}
               </span>
@@ -263,10 +266,13 @@ export default async function ContributorPassportPage({
       {/* Verified Credentials Showcase */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-white font-mono uppercase tracking-wider">
-            Verified Credentials ({credentials.length})
+          <h2 className="text-sm font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
+            <span>Verified Credentials</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              {credentials.length}
+            </span>
           </h2>
-          <span className="text-[11px] font-mono text-slate-500">Public Proof of Work</span>
+          <span className="text-[11px] font-mono text-slate-500">Official GitHub Proof of Work</span>
         </div>
 
         {credentials.length === 0 ? (
@@ -300,7 +306,7 @@ export default async function ContributorPassportPage({
                     href={`/verify/${cred.id}`}
                     className="inline-flex items-center gap-1.5 text-xs font-mono text-sky-400 hover:text-sky-300 underline"
                   >
-                    <span>Inspect Cryptographic Evidence</span>
+                    <span>Verify Record & GitHub Evidence</span>
                     <span>→</span>
                   </Link>
                 </div>

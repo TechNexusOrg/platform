@@ -100,12 +100,15 @@ export default async function VerifyCredentialPage({
                   isRevoked ? "text-red-400" : "text-emerald-400"
                 }`}
               >
-                {isRevoked ? "Revoked Credential" : "Cryptographically Verified"}
+                {isRevoked ? "Revoked Record" : "GitHub-Backed Proof of Work"}
               </span>
             </div>
             <h1 className="text-2xl font-bold text-white font-mono">
               {credential.title}
             </h1>
+            <p className="text-xs text-slate-400 font-mono">
+              Verified from official GitHub contribution events recorded by TechNexusOrg.
+            </p>
           </div>
 
           <div className="text-left sm:text-right font-mono text-xs text-slate-500">
@@ -205,9 +208,23 @@ export default async function VerifyCredentialPage({
                 {evidence?.mergedAt ? new Date(evidence.mergedAt).toUTCString() : "Verified"}
               </span>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5">
+            {evidence?.mergeCommitSha && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 border-b border-slate-800/80">
+                <span className="text-slate-400">Merge Commit SHA:</span>
+                <span className="font-mono text-slate-300 text-[11px] truncate max-w-xs">
+                  {evidence.mergeCommitSha}
+                </span>
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 border-b border-slate-800/80">
               <span className="text-slate-400">Verification Source:</span>
               <span className="font-mono text-emerald-400">GitHub Webhook / SHA256 HMAC</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5">
+              <span className="text-slate-400">Verification Timestamp:</span>
+              <span className="font-mono text-slate-300">
+                {evidence?.verifiedAt ? new Date(evidence.verifiedAt).toUTCString() : "Recorded"}
+              </span>
             </div>
           </div>
 

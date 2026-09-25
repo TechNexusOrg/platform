@@ -45,7 +45,7 @@ export default async function FirstPRPage() {
           Your First Legitimate Contribution
         </h1>
         <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          Open-source can feel intimidating. The #FirstPR initiative provides curated beginner issues, active review feedback, and automatic cryptographic proof of work upon merge.
+          Open-source can feel intimidating. The #FirstPR initiative provides curated beginner issues, active review feedback, and verifiable GitHub-backed proof of work upon merge.
         </p>
       </div>
 

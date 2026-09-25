@@ -3,7 +3,7 @@ import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
 export interface ParsedIssueMetadata {
-  difficulty: "beginner" | "intermediate" | "advanced";
+  difficulty: "unclassified" | "beginner" | "intermediate" | "advanced";
   estimatedEffort: string | null;
   skillsRequired: string[];
   isGoodFirstIssue: boolean;
@@ -36,12 +36,12 @@ export function parseIssueLabels(labels: Array<{ name?: string } | string>): Par
 
   const lowerLabels = labelNames.map((l) => l.toLowerCase());
 
-  let difficulty: "beginner" | "intermediate" | "advanced" = "beginner";
+  let difficulty: "unclassified" | "beginner" | "intermediate" | "advanced" = "unclassified";
   if (lowerLabels.some((l) => l.includes("advanced") || l.includes("hard") || l.includes("complex"))) {
     difficulty = "advanced";
   } else if (lowerLabels.some((l) => l.includes("intermediate") || l.includes("medium"))) {
     difficulty = "intermediate";
-  } else if (lowerLabels.some((l) => l.includes("beginner") || l.includes("easy") || l.includes("good first"))) {
+  } else if (lowerLabels.some((l) => l.includes("beginner") || l.includes("easy") || l.includes("good first") || l.includes("good-first-issue"))) {
     difficulty = "beginner";
   }
 
@@ -61,8 +61,10 @@ export function parseIssueLabels(labels: Array<{ name?: string } | string>): Par
     estimatedEffort = "1–3 hours";
   } else if (difficulty === "intermediate") {
     estimatedEffort = "3–8 hours";
-  } else {
+  } else if (difficulty === "advanced") {
     estimatedEffort = "1–2 days";
+  } else {
+    estimatedEffort = null;
   }
 
   // Extract skills from labels

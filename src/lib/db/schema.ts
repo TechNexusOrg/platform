@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -115,10 +116,10 @@ export const projects = pgTable(
       .default("all_levels")
       .notNull(),
     maintainerId: text("maintainer_id").references(() => users.id),
-    isOfficial: boolean("is_official").default(true).notNull(),
-    contributionEnabled: boolean("contribution_enabled").default(true).notNull(),
-    firstPrEnabled: boolean("first_pr_enabled").default(true).notNull(),
-    approvedAt: timestamp("approved_at", { withTimezone: true }).defaultNow(),
+    isOfficial: boolean("is_official").default(false).notNull(),
+    contributionEnabled: boolean("contribution_enabled").default(false).notNull(),
+    firstPrEnabled: boolean("first_pr_enabled").default(false).notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
     starsCount: integer("stars_count").default(0).notNull(),
     forksCount: integer("forks_count").default(0).notNull(),
     openIssuesCount: integer("open_issues_count").default(0).notNull(),
@@ -154,9 +155,9 @@ export const issues = pgTable(
     htmlUrl: text("html_url").notNull(),
     labels: jsonb("labels").$type<string[]>().default([]).notNull(),
     difficulty: text("difficulty", {
-      enum: ["beginner", "intermediate", "advanced"],
+      enum: ["unclassified", "beginner", "intermediate", "advanced"],
     })
-      .default("beginner")
+      .default("unclassified")
       .notNull(),
     estimatedEffort: text("estimated_effort"), // e.g. "2-4 hours"
     skillsRequired: jsonb("skills_required").$type<string[]>().default([]).notNull(),
@@ -188,6 +189,7 @@ export const contributions = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     issueId: text("issue_id").references(() => issues.id),
+    claimId: text("claim_id").references(() => issueClaims.id),
     githubPrNumber: integer("github_pr_number").notNull(),
     prTitle: text("pr_title").notNull(),
     prUrl: text("pr_url").notNull(),
@@ -208,6 +210,7 @@ export const contributions = pgTable(
   (table) => [
     index("contributions_user_id_idx").on(table.userId),
     index("contributions_project_id_idx").on(table.projectId),
+    index("contributions_claim_id_idx").on(table.claimId),
     index("contributions_state_idx").on(table.state),
     uniqueIndex("contributions_pr_url_idx").on(table.prUrl),
   ]
@@ -333,6 +336,9 @@ export const issueClaims = pgTable(
       .notNull(),
   },
   (table) => [
+    uniqueIndex("issue_claims_active_issue_idx")
+      .on(table.issueId)
+      .where(sql`${table.status} = 'active'`),
     index("issue_claims_issue_id_idx").on(table.issueId),
     index("issue_claims_user_id_idx").on(table.userId),
     index("issue_claims_status_idx").on(table.status),
@@ -350,6 +356,13 @@ export const pullRequests = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     issueId: text("issue_id").references(() => issues.id),
+    claimId: text("claim_id").references(() => issueClaims.id),
+    associationStatus: text("association_status", {
+      enum: ["claimed", "explicit_reference", "inferred", "ambiguous", "unlinked"],
+    })
+      .default("unlinked")
+      .notNull(),
+    associationSource: text("association_source"),
     githubPrId: integer("github_pr_id").notNull(),
     githubPrNumber: integer("github_pr_number").notNull(),
     title: text("title").notNull(),
@@ -378,6 +391,7 @@ export const pullRequests = pgTable(
     index("pull_requests_user_id_idx").on(table.userId),
     index("pull_requests_project_id_idx").on(table.projectId),
     index("pull_requests_issue_id_idx").on(table.issueId),
+    index("pull_requests_claim_id_idx").on(table.claimId),
     index("pull_requests_state_idx").on(table.state),
   ]
 );
@@ -423,7 +437,7 @@ export const githubWebhookDeliveries = pgTable(
       .defaultNow()
       .notNull(),
     processedAt: timestamp("processed_at", { withTimezone: true }),
-    status: text("status", { enum: ["received", "processed", "ignored", "error"] })
+    status: text("status", { enum: ["received", "processing", "processed", "ignored", "error"] })
       .default("received")
       .notNull(),
     error: text("error"),
@@ -433,6 +447,12 @@ export const githubWebhookDeliveries = pgTable(
     index("webhook_deliveries_status_idx").on(table.status),
   ]
 );
+
+// --- FOUNDING ALLOCATION COUNTER (ATOMIC SEQUENCE) ---
+export const foundingAllocationCounter = pgTable("founding_allocation_counter", {
+  id: text("id").primaryKey(),
+  currentNumber: integer("current_number").default(0).notNull(),
+});
 
 // --- NOTIFICATIONS ---
 export const notifications = pgTable(

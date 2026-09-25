@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { verifySessionToken, createSessionToken, COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { recommendIssues } from "@/lib/recommendations/engine";
 
 const onboardingSchema = z.object({
@@ -110,8 +110,14 @@ export async function POST(request: NextRequest) {
       })
       .from(schema.issues)
       .innerJoin(schema.projects, eq(schema.issues.projectId, schema.projects.id))
-      .where(eq(schema.issues.state, "open"))
-      .limit(50);
+      .where(
+        and(
+          eq(schema.issues.state, "open"),
+          eq(schema.projects.isOfficial, true),
+          eq(schema.projects.contributionEnabled, true)
+        )
+      )
+      .limit(100);
 
     const mappedExpLevel =
       validated.experienceLevel === "complete_beginner"
@@ -121,7 +127,7 @@ export async function POST(request: NextRequest) {
     const matched = recommendIssues(
       openIssues.map((i: any) => ({
         ...i,
-        difficulty: i.difficulty as "beginner" | "intermediate" | "advanced",
+        difficulty: i.difficulty as "unclassified" | "beginner" | "intermediate" | "advanced",
       })),
       {
         skills: combinedSkills,
@@ -133,6 +139,19 @@ export async function POST(request: NextRequest) {
       10
     );
 
+    const top = matched[0];
+    const topMatch = top
+      ? {
+          id: top.issue.id,
+          title: top.issue.title,
+          repo: top.issue.githubRepo,
+          difficulty: top.issue.difficulty,
+          estimatedEffort: top.issue.estimatedEffort || "1–3 hours",
+          primaryLanguage: top.issue.primaryLanguage,
+          matchReasons: top.matchReasons,
+        }
+      : null;
+
     // Refresh session token with isOnboarded = true
     const updatedSessionUser = {
       ...sessionUser,
@@ -143,7 +162,8 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       success: true,
       matchingIssuesCount: matched.length,
-      redirect: "/dashboard",
+      topMatch,
+      redirect: topMatch ? `/issues/${topMatch.id}` : "/issues",
     });
 
     response.cookies.set(COOKIE_NAME, newToken, {

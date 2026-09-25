@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
+import { NotificationBell } from "./NotificationBell";
 
 export async function Navbar() {
   const cookieStore = await cookies();
@@ -21,21 +22,36 @@ export async function Navbar() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
+            <Link href="/issues" className="hover:text-white transition-colors">
+              Issues
+            </Link>
+            <Link href="/projects" className="hover:text-white transition-colors">
+              Projects
+            </Link>
             <Link href="/first-pr" className="hover:text-white transition-colors">
               #FirstPR
             </Link>
             <Link href="/founding-1000" className="hover:text-white transition-colors">
               Founding 1,000
             </Link>
-            <Link href="/projects" className="hover:text-white transition-colors">
-              Projects
-            </Link>
-            <Link href="/issues" className="hover:text-white transition-colors">
-              Issues
-            </Link>
             <Link href="/people" className="hover:text-white transition-colors">
               Contributors
             </Link>
+            {user && (
+              <>
+                <Link href="/dashboard/work" className="text-sky-400 hover:text-sky-300 transition-colors">
+                  My Work
+                </Link>
+                <Link href="/dashboard/mentorship" className="hover:text-white transition-colors">
+                  Mentorship
+                </Link>
+                {(user.role === "admin" || user.role === "maintainer") && (
+                  <Link href="/admin" className="text-amber-400 hover:text-amber-300 font-mono text-xs transition-colors">
+                    Admin
+                  </Link>
+                )}
+              </>
+            )}
           </nav>
         </div>
 
@@ -51,6 +67,8 @@ export async function Navbar() {
 
           {user ? (
             <div className="flex items-center gap-3">
+              <NotificationBell />
+
               <Link
                 href="/dashboard"
                 className="flex items-center gap-2 rounded-md border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-slate-700 hover:bg-slate-900 transition-colors"
@@ -67,10 +85,11 @@ export async function Navbar() {
                   {user.level.replace("_", " ")}
                 </span>
               </Link>
+
               <form action="/api/auth/logout" method="POST">
                 <button
                   type="submit"
-                  className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                  className="text-xs text-slate-400 hover:text-slate-200 transition-colors font-mono"
                 >
                   Logout
                 </button>

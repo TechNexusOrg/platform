@@ -418,26 +418,47 @@ export function IssueWorkspaceClient({
 
           {/* Guided Contribution Steps Workspace */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-6">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-white">
-              Contribution Steps
-            </h3>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-white">
+                How to Complete This Contribution
+              </h3>
+              <span className="text-[10px] font-mono text-sky-400 font-semibold">
+                Beginner-First Walkthrough
+              </span>
+            </div>
 
-            <div className="space-y-5 text-xs">
-              {/* Step 1 */}
+            <div className="space-y-6 text-xs font-mono">
+              {/* Step 1-4: Setup */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 font-mono font-bold text-slate-200">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-sky-400 border border-slate-700">
-                    1
+                    1–4
                   </span>
-                  <span>Clone & Branch</span>
+                  <span>Read, Claim & Fork</span>
+                </div>
+                <div className="space-y-1.5 pl-7 text-[11px] text-slate-400">
+                  <p>1. Read the issue scope and acceptance criteria above carefully.</p>
+                  <p>2. Claim this issue using the button above to reserve your 7-day slot.</p>
+                  <p>3. Open <a href={`https://github.com/${project.githubRepo}`} target="_blank" rel="noopener noreferrer" className="text-sky-400 underline">https://github.com/{project.githubRepo}</a>.</p>
+                  <p>4. Click <strong className="text-white">Fork</strong> in GitHub to create your own copy.</p>
+                </div>
+              </div>
+
+              {/* Step 5-6: Clone & Branch */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-sky-400 border border-slate-700">
+                    5–6
+                  </span>
+                  <span>Clone & Create Branch</span>
                 </div>
                 <div className="space-y-2 pl-7">
                   <p className="text-slate-400 text-[11px]">
-                    Clone the repository and create a feature branch:
+                    Clone your fork locally and create a dedicated branch:
                   </p>
                   <div className="relative group">
-                    <pre className="rounded-lg bg-slate-950 border border-slate-800 p-2.5 font-mono text-[11px] text-slate-300 overflow-x-auto">
-                      git clone https://github.com/{project.githubRepo}.git{"\n"}
+                    <pre className="rounded-lg bg-slate-950 border border-slate-800 p-2.5 text-[11px] text-slate-300 overflow-x-auto">
+                      git clone https://github.com/{currentUser?.githubUsername || "<your-username>"}/{project.name.toLowerCase()}.git{"\n"}
                       cd {project.name.toLowerCase()}{"\n"}
                       git checkout -b fix/issue-{issue.githubIssueNumber}
                     </pre>
@@ -445,11 +466,11 @@ export function IssueWorkspaceClient({
                       type="button"
                       onClick={() =>
                         copyToClipboard(
-                          `git clone https://github.com/${project.githubRepo}.git && cd ${project.name.toLowerCase()} && git checkout -b fix/issue-${issue.githubIssueNumber}`,
+                          `git clone https://github.com/${currentUser?.githubUsername || "<your-username>"}/${project.name.toLowerCase()}.git && cd ${project.name.toLowerCase()} && git checkout -b fix/issue-${issue.githubIssueNumber}`,
                           "clone-step"
                         )
                       }
-                      className="absolute top-2 right-2 rounded bg-slate-800 px-2 py-1 text-[10px] font-mono text-slate-300 hover:text-white transition-colors"
+                      className="absolute top-2 right-2 rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-300 hover:text-white transition-colors"
                     >
                       {copiedIndex === "clone-step" ? "Copied!" : "Copy"}
                     </button>
@@ -457,65 +478,122 @@ export function IssueWorkspaceClient({
                 </div>
               </div>
 
-              {/* Step 2 */}
+              {/* Step 7-8: Implement & Test */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 font-mono font-bold text-slate-200">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-sky-400 border border-slate-700">
-                    2
+                    7–8
                   </span>
-                  <span>Implement & Test</span>
+                  <span>Implement & Run Tests</span>
                 </div>
                 <div className="space-y-2 pl-7">
                   <p className="text-slate-400 text-[11px]">
-                    Install dependencies and run test verification locally:
-                  </p>
-                  <pre className="rounded-lg bg-slate-950 border border-slate-800 p-2.5 font-mono text-[11px] text-slate-300 overflow-x-auto">
-                    npm install{"\n"}npm test
-                  </pre>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 font-mono font-bold text-slate-200">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-sky-400 border border-slate-700">
-                    3
-                  </span>
-                  <span>Open PR with Link</span>
-                </div>
-                <div className="space-y-2 pl-7">
-                  <p className="text-slate-400 text-[11px]">
-                    Include this exact line in your Pull Request description:
+                    Implement your code changes, then run project tests and type checks:
                   </p>
                   <div className="relative group">
-                    <pre className="rounded-lg bg-slate-950 border border-emerald-500/20 p-2.5 font-mono text-[11px] text-emerald-300 overflow-x-auto font-bold">
-                      Fixes #{issue.githubIssueNumber}
+                    <pre className="rounded-lg bg-slate-950 border border-slate-800 p-2.5 text-[11px] text-slate-300 overflow-x-auto">
+                      npm install{"\n"}
+                      npm test{"\n"}
+                      npm run typecheck
                     </pre>
                     <button
                       type="button"
                       onClick={() =>
-                        copyToClipboard(`Fixes #${issue.githubIssueNumber}`, "fixes-step")
+                        copyToClipboard("npm test && npm run typecheck", "test-step")
                       }
-                      className="absolute top-2 right-2 rounded bg-slate-800 px-2 py-1 text-[10px] font-mono text-slate-300 hover:text-white transition-colors"
+                      className="absolute top-2 right-2 rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-300 hover:text-white transition-colors"
                     >
-                      {copiedIndex === "fixes-step" ? "Copied!" : "Copy"}
+                      {copiedIndex === "test-step" ? "Copied!" : "Copy"}
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Step 4 */}
+              {/* Step 9-10: Commit & Push */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 font-mono font-bold text-slate-200">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-sky-400 border border-slate-700">
-                    4
+                    9–10
                   </span>
-                  <span>Merge & Verification</span>
+                  <span>Commit & Push Branch</span>
                 </div>
-                <div className="pl-7">
-                  <p className="text-slate-400 text-[11px] leading-relaxed">
-                    Once merged, GitHub webhooks automatically detect the closure, update your Contributor Passport, and mint your verifiable credential.
+                <div className="space-y-2 pl-7">
+                  <div className="relative group">
+                    <pre className="rounded-lg bg-slate-950 border border-slate-800 p-2.5 text-[11px] text-slate-300 overflow-x-auto">
+                      git add .{"\n"}
+                      git commit -m &quot;fix: resolve issue #{issue.githubIssueNumber}&quot;{"\n"}
+                      git push origin fix/issue-{issue.githubIssueNumber}
+                    </pre>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyToClipboard(
+                          `git add . && git commit -m "fix: resolve issue #${issue.githubIssueNumber}" && git push origin fix/issue-${issue.githubIssueNumber}`,
+                          "push-step"
+                        )
+                      }
+                      className="absolute top-2 right-2 rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-300 hover:text-white transition-colors"
+                    >
+                      {copiedIndex === "push-step" ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 11: Open Pull Request with Description */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-emerald-400 border border-emerald-500/40">
+                    11
+                  </span>
+                  <span>Open PR with Standard Body</span>
+                </div>
+                <div className="space-y-2 pl-7">
+                  <p className="text-slate-400 text-[11px]">
+                    Open a PR on GitHub and paste this description template:
                   </p>
+                  <div className="relative group">
+                    <pre className="rounded-lg bg-slate-950 border border-emerald-500/30 p-2.5 text-[11px] text-emerald-300 overflow-x-auto font-mono">
+                      ## Summary{"\n"}
+                      Resolves issue #{issue.githubIssueNumber}.{"\n"}
+                      {"\n"}
+                      ## Changes{"\n"}
+                      - Implemented required solution{"\n"}
+                      - Added/updated test coverage{"\n"}
+                      {"\n"}
+                      ## Testing{"\n"}
+                      - npm test passed{"\n"}
+                      {"\n"}
+                      Fixes #{issue.githubIssueNumber}
+                    </pre>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyToClipboard(
+                          `## Summary\nResolves issue #${issue.githubIssueNumber}.\n\n## Changes\n- Implemented required solution\n- Added/updated test coverage\n\n## Testing\n- npm test passed\n\nFixes #${issue.githubIssueNumber}`,
+                          "pr-body-step"
+                        )
+                      }
+                      className="absolute top-2 right-2 rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-300 hover:text-white transition-colors"
+                    >
+                      {copiedIndex === "pr-body-step" ? "Copied!" : "Copy Template"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 12-14: Review, Response & Verification */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px] text-sky-400 border border-slate-700">
+                    12–14
+                  </span>
+                  <span>Review, Merge & Proof Verification</span>
+                </div>
+                <div className="space-y-1.5 pl-7 text-[11px] text-slate-400">
+                  <p>12. Wait for repository maintainers to review your code.</p>
+                  <p>13. If changes are requested, push additional commits to the same branch.</p>
+                  <p>14. Upon merge, TechNexusOrg automatically detects the closure via GitHub events, marks your claim completed, updates your Contributor Passport, and mints your proof-of-work record.</p>
                 </div>
               </div>
             </div>

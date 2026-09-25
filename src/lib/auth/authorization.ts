@@ -58,3 +58,30 @@ export function hasRole(
   if (!user) return false;
   return allowedRoles.includes(user.role);
 }
+
+/**
+ * Enforces authorization by checking the fresh user record from the database for userId.
+ * Throws an Error if user is not found or lacks the required role.
+ */
+export async function requireRole(
+  userId: string,
+  allowedRoles: string[]
+): Promise<AuthenticatedUserRecord> {
+  const db = await getDb();
+  const users = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+
+  if (users.length === 0) {
+    throw new Error("Unauthorized: user not found");
+  }
+
+  const user = users[0] as AuthenticatedUserRecord;
+  if (!allowedRoles.includes(user.role)) {
+    throw new Error("Forbidden: insufficient permissions");
+  }
+
+  return user;
+}

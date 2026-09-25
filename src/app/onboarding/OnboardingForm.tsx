@@ -117,7 +117,10 @@ export function OnboardingForm({ user }: { user: { githubUsername: string; displ
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [completionData, setCompletionData] = useState<{ matchingIssuesCount: number } | null>(null);
+  const [completionData, setCompletionData] = useState<{
+    matchingIssuesCount: number;
+    topMatch?: any;
+  } | null>(null);
 
   const toggleArrayItem = (list: string[], setList: (v: string[]) => void, item: string) => {
     if (list.includes(item)) {
@@ -174,7 +177,10 @@ export function OnboardingForm({ user }: { user: { githubUsername: string; displ
         throw new Error(data.error || "Failed to complete onboarding");
       }
 
-      setCompletionData({ matchingIssuesCount: data.matchingIssuesCount ?? 0 });
+      setCompletionData({
+        matchingIssuesCount: data.matchingIssuesCount ?? 0,
+        topMatch: data.topMatch || null,
+      });
       router.refresh();
     } catch (err: any) {
       setError(err.message);
@@ -182,44 +188,110 @@ export function OnboardingForm({ user }: { user: { githubUsername: string; displ
     }
   };
 
-  // Completion Screen
+  // Completion Screen — First Contribution Path
   if (completionData) {
-    return (
-      <div className="max-w-2xl mx-auto rounded-2xl border border-slate-800 bg-slate-900/60 p-8 sm:p-10 text-center space-y-6 animate-fade-in">
-        <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xl font-mono">
-          ✓
-        </div>
+    const top = completionData.topMatch;
 
-        <div className="space-y-2">
-          <div className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
-            Onboarding Completed
+    return (
+      <div className="max-w-2xl mx-auto rounded-2xl border border-slate-800 bg-slate-900/60 p-8 sm:p-10 space-y-6 animate-fade-in">
+        <div className="text-center space-y-2">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xl font-mono mb-2">
+            ✓
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-mono uppercase">
-            Your First Contribution is Ready
+          <div className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
+            Profile Initialized
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-mono">
+            Your First Contribution Path is Ready
           </h2>
-          <p className="text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
-            Welcome to the community, <span className="font-mono text-white font-bold">@{user.githubUsername}</span>. We
-            analyzed your skills and identified{" "}
-            <span className="font-mono text-sky-400 font-bold">{completionData.matchingIssuesCount}</span> open
-            issues matching your profile.
+          <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
+            Welcome, <span className="font-mono text-white font-bold">@{user.githubUsername}</span>. We matched your
+            skills with <span className="font-mono text-sky-400 font-bold">{completionData.matchingIssuesCount}</span> open
+            issues on official TechNexusOrg repositories.
           </p>
         </div>
 
-        <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link
-            href="/issues"
-            className="w-full sm:w-auto rounded-xl bg-sky-500 px-6 py-3 text-xs font-bold font-mono text-slate-950 hover:bg-sky-400 shadow-lg shadow-sky-500/20 transition-all flex items-center justify-center gap-2"
-          >
-            <span>View Recommended Issues</span>
-            <span>→</span>
-          </Link>
-          <Link
-            href="/dashboard"
-            className="w-full sm:w-auto rounded-xl border border-slate-700 bg-slate-800 px-6 py-3 text-xs font-semibold font-mono text-slate-200 hover:text-white hover:bg-slate-700 transition-colors"
-          >
-            Go to Contributor Dashboard
-          </Link>
-        </div>
+        {top ? (
+          <div className="rounded-xl border border-sky-500/30 bg-sky-950/20 p-5 space-y-4 text-left">
+            <div className="flex items-center justify-between gap-2 border-b border-sky-500/20 pb-3">
+              <span className="text-xs font-mono font-semibold text-sky-400">
+                Recommended First Task
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 capitalize">
+                {top.difficulty}
+              </span>
+            </div>
+
+            <div>
+              <div className="text-xs font-mono text-slate-400">
+                {top.repo}
+              </div>
+              <h3 className="text-sm font-bold text-white font-mono mt-0.5">
+                {top.title}
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-slate-400 pt-1">
+              <div>
+                <span className="text-slate-500">Language:</span>{" "}
+                <span className="text-slate-300">{top.primaryLanguage}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Est. Effort:</span>{" "}
+                <span className="text-slate-300">{top.estimatedEffort}</span>
+              </div>
+            </div>
+
+            {top.matchReasons && top.matchReasons.length > 0 && (
+              <div className="text-xs font-mono text-slate-400 pt-2 border-t border-sky-500/10">
+                <span className="text-sky-300 font-semibold block mb-1">Why this matches you:</span>
+                <ul className="space-y-1">
+                  {top.matchReasons.slice(0, 2).map((reason: string, i: number) => (
+                    <li key={i} className="flex items-center gap-1.5 text-slate-300">
+                      <span className="text-sky-400">•</span>
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="rounded-lg bg-slate-900/80 p-3 text-[11px] font-mono text-slate-400 border border-slate-800">
+              <span className="text-white font-semibold block mb-0.5">First Step:</span>
+              Open the contribution workspace, claim this issue to reserve it, and follow the terminal commands to submit your PR.
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+              <Link
+                href={`/issues/${top.id}`}
+                className="w-full sm:w-auto flex-1 rounded-xl bg-sky-500 px-5 py-3 text-xs font-bold font-mono text-slate-950 hover:bg-sky-400 shadow-lg shadow-sky-500/20 transition-all text-center"
+              >
+                Start This Contribution →
+              </Link>
+              <Link
+                href="/issues"
+                className="w-full sm:w-auto rounded-xl border border-slate-700 bg-slate-800 px-5 py-3 text-xs font-semibold font-mono text-slate-300 hover:text-white hover:bg-slate-700 transition-colors text-center"
+              >
+                Browse Other Issues
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/issues"
+              className="w-full sm:w-auto rounded-xl bg-sky-500 px-6 py-3 text-xs font-bold font-mono text-slate-950 hover:bg-sky-400 shadow-lg transition-all text-center"
+            >
+              Browse All Issues →
+            </Link>
+            <Link
+              href="/dashboard/work"
+              className="w-full sm:w-auto rounded-xl border border-slate-700 bg-slate-800 px-6 py-3 text-xs font-semibold font-mono text-slate-200 hover:text-white text-center"
+            >
+              My Work Dashboard
+            </Link>
+          </div>
+        )}
       </div>
     );
   }

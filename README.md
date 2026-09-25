@@ -4,7 +4,7 @@
 
 TechNexusOrg is a GitHub-native contributor and career infrastructure platform connecting students and early-career developers with legitimate open-source engineering experience.
 
-This is **not a certificate-selling website**. Credentials and Contributor Passports are cryptographically verifiable records generated exclusively from verified, reviewed, and merged GitHub pull requests.
+This is **not a certificate-selling website**. Credentials and Contributor Passports are GitHub-backed, database-verifiable proof-of-work records generated exclusively from verified, reviewed, and merged GitHub pull requests.
 
 ---
 

@@ -51,6 +51,22 @@ describe("Deterministic Issue Recommendation Engine", () => {
       isHelpWanted: true,
       primaryLanguage: "TypeScript",
     },
+    {
+      id: "iss_go_easy",
+      projectId: "proj_4",
+      projectName: "Go CLI Tools",
+      githubRepo: "TechNexusOrg/go-tools",
+      title: "Add error logging to CLI",
+      bodySnippet: "Improve error formatting",
+      htmlUrl: "https://github.com/TechNexusOrg/go-tools/issues/5",
+      labels: ["beginner"],
+      difficulty: "beginner",
+      estimatedEffort: "2 hours",
+      skillsRequired: ["Go"],
+      isGoodFirstIssue: false,
+      isHelpWanted: false,
+      primaryLanguage: "Go",
+    },
   ];
 
   it("prioritizes beginner Python good-first-issue for a beginner Python learner", () => {

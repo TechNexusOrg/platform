@@ -578,7 +578,7 @@ export default async function DashboardPage() {
             Verified Credentials ({userCredentials.length})
           </h2>
           <span className="text-xs text-slate-500 font-mono">
-            Cryptographic proof of work records
+            GitHub-backed proof-of-work records
           </span>
         </div>
 

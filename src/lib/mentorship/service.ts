@@ -68,9 +68,12 @@ export async function getMentorRequestsForUser(
         studentUsername: schema.users.githubUsername,
         studentDisplayName: schema.users.displayName,
         studentAvatar: schema.users.avatarUrl,
+        issueTitle: schema.issues.title,
+        issueNumber: schema.issues.githubIssueNumber,
       })
       .from(schema.mentorRequests)
       .innerJoin(schema.users, eq(schema.mentorRequests.studentId, schema.users.id))
+      .innerJoin(schema.issues, eq(schema.mentorRequests.issueId, schema.issues.id))
       .where(
         or(
           eq(schema.mentorRequests.mentorId, userId),
@@ -91,8 +94,11 @@ export async function getMentorRequestsForUser(
       reply: schema.mentorRequests.reply,
       status: schema.mentorRequests.status,
       createdAt: schema.mentorRequests.createdAt,
+      issueTitle: schema.issues.title,
+      issueNumber: schema.issues.githubIssueNumber,
     })
     .from(schema.mentorRequests)
+    .innerJoin(schema.issues, eq(schema.mentorRequests.issueId, schema.issues.id))
     .where(eq(schema.mentorRequests.studentId, userId))
     .orderBy(desc(schema.mentorRequests.createdAt));
 }

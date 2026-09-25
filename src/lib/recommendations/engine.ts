@@ -7,7 +7,7 @@ export interface IssueCandidate {
   bodySnippet: string | null;
   htmlUrl: string;
   labels: string[];
-  difficulty: "beginner" | "intermediate" | "advanced";
+  difficulty: "unclassified" | "beginner" | "intermediate" | "advanced";
   estimatedEffort: string | null;
   skillsRequired: string[];
   isGoodFirstIssue: boolean;
@@ -41,6 +41,11 @@ export function recommendIssues(
   const scored: RecommendedIssue[] = [];
 
   for (const issue of issues) {
+    // Beginners must receive explicitly verified beginner issues; unclassified issues are never treated as beginner
+    if (preferences.experienceLevel === "beginner" && issue.difficulty !== "beginner") {
+      continue;
+    }
+
     let score = 0;
     const matchReasons: string[] = [];
 
@@ -54,6 +59,12 @@ export function recommendIssues(
     ) {
       score += 15;
       matchReasons.push("Quick win for intermediate level");
+    } else if (
+      preferences.experienceLevel === "advanced" &&
+      (issue.difficulty === "intermediate" || issue.difficulty === "unclassified")
+    ) {
+      score += 10;
+      matchReasons.push("Broader issue pool for advanced contributor");
     }
 
     // 2. Beginner Good-First-Issue Bonus (20 pts)

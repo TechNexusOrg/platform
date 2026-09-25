@@ -15,6 +15,8 @@ export interface ContributorMetrics {
   projectsContributedCount: number;
   isOnboarded: boolean;
   isMaintainerAssigned?: boolean;
+  isProjectLeadAssigned?: boolean;
+  isMentorAssigned?: boolean;
 }
 
 export interface ProgressionResult {
@@ -31,12 +33,18 @@ export function evaluateProgression(
 ): ProgressionResult {
   let eligibleLevel: ContributorLevel = "explorer";
 
-  if (metrics.isMaintainerAssigned) {
+  // Appointment-based tracks: preserve existing appointments without automatic demotion
+  if (currentLevel === "project_lead" || metrics.isProjectLeadAssigned) {
+    eligibleLevel = "project_lead";
+  } else if (currentLevel === "maintainer" || metrics.isMaintainerAssigned) {
     eligibleLevel = "maintainer";
+  } else if (currentLevel === "mentor" || metrics.isMentorAssigned) {
+    eligibleLevel = "mentor";
   } else if (
-    metrics.prsMerged >= 10 &&
-    metrics.reviewsCompleted >= 3 &&
-    metrics.projectsContributedCount >= 2
+    metrics.prsMerged >= 5 &&
+    metrics.reviewsCompleted >= 2 &&
+    metrics.projectsContributedCount >= 2 &&
+    metrics.issuesResolved >= 2
   ) {
     eligibleLevel = "core_contributor";
   } else if (
@@ -58,18 +66,19 @@ export function evaluateProgression(
     case "explorer":
       nextLevel = "contributor";
       if (!metrics.isOnboarded) requirements.push("Complete profile onboarding");
-      if (metrics.prsMerged < 1) requirements.push("Merge 1 legitimate pull request on an official project");
+      if (metrics.prsMerged < 1) requirements.push("Merge 1 legitimate pull request on an official approved project");
       break;
     case "contributor":
       nextLevel = "active_contributor";
-      if (metrics.prsMerged < 3) requirements.push(`Merge ${3 - metrics.prsMerged} more pull request(s) (total 3)`);
-      if (metrics.projectsContributedCount < 1) requirements.push("Contribute to at least 1 official project");
+      if (metrics.prsMerged < 3) requirements.push(`Merge ${3 - metrics.prsMerged} more pull request(s) on approved projects (total 3)`);
+      if (metrics.projectsContributedCount < 1) requirements.push("Contribute to at least 1 official approved project");
       break;
     case "active_contributor":
       nextLevel = "core_contributor";
-      if (metrics.prsMerged < 10) requirements.push(`Merge ${10 - metrics.prsMerged} more pull request(s) (total 10)`);
-      if (metrics.reviewsCompleted < 3) requirements.push(`Complete ${3 - metrics.reviewsCompleted} peer code review(s)`);
-      if (metrics.projectsContributedCount < 2) requirements.push("Contribute to at least 2 distinct projects");
+      if (metrics.prsMerged < 5) requirements.push(`Merge ${5 - metrics.prsMerged} more pull request(s) (total 5)`);
+      if (metrics.reviewsCompleted < 2) requirements.push(`Complete ${2 - metrics.reviewsCompleted} peer code review(s) (total 2)`);
+      if (metrics.projectsContributedCount < 2) requirements.push("Contribute across at least 2 distinct approved projects");
+      if (metrics.issuesResolved < 2) requirements.push("Resolve at least 2 claimed issues");
       break;
     case "core_contributor":
       nextLevel = "maintainer";
@@ -85,8 +94,8 @@ export function evaluateProgression(
     active_contributor: 2,
     core_contributor: 3,
     maintainer: 4,
-    project_lead: 5,
     mentor: 4,
+    project_lead: 5,
   };
 
   const canPromote = levelRank[eligibleLevel] > levelRank[currentLevel];

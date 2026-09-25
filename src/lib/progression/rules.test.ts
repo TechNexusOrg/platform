@@ -18,7 +18,7 @@ describe("Progression Rules Engine", () => {
     expect(res.nextLevel).toBe("contributor");
     expect(res.requirementsForNextLevel).toContain("Complete profile onboarding");
     expect(res.requirementsForNextLevel).toContain(
-      "Merge 1 legitimate pull request on an official project"
+      "Merge 1 legitimate pull request on an official approved project"
     );
   });
 

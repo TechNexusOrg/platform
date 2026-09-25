@@ -41,20 +41,27 @@ export async function expireOverdueClaims(database?: any) {
     );
 }
 
+export const CLAIM_LIMITS_BY_LEVEL: Record<string, number> = {
+  explorer: 1,
+  contributor: 1,
+  active_contributor: 2,
+  core_contributor: 2,
+  maintainer: 3,
+  project_lead: 3,
+  mentor: 3,
+};
+
 /**
- * Returns the maximum number of active issues a user can claim concurrently based on contributor level.
- * Level 1 (Observer) & Level 2 (Explorer): 1 active claim.
- * Level 3+ (Builder, Architect, Maintainer): 2 active claims.
+ * Returns the maximum number of active issues a user can claim concurrently based on canonical contributor level.
  */
 export function getMaxActiveClaimsForLevel(level?: string | null): number {
-  if (level === "level_3" || level === "level_4" || level === "level_5") {
-    return 2;
-  }
-  return 1;
+  if (!level) return 1;
+  return CLAIM_LIMITS_BY_LEVEL[level] ?? 1;
 }
 
 /**
  * Claims an issue for a contributor.
+ * Concurrency-safe: Protected by partial unique index issue_claims_active_issue_idx.
  */
 export async function claimIssue(
   params: {
@@ -167,29 +174,44 @@ export async function claimIssue(
     );
   }
 
-  // 5. Create claim
+  // 5. Create claim atomically
   const claimId = `claim_${crypto.randomUUID()}`;
   const expiresAt = new Date(now.getTime() + CLAIM_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
-  const [newClaim] = await db
-    .insert(schema.issueClaims)
-    .values({
-      id: claimId,
-      issueId: params.issueId,
-      userId: params.userId,
-      status: "active",
-      claimedAt: now,
-      expiresAt,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
+  try {
+    const [newClaim] = await db
+      .insert(schema.issueClaims)
+      .values({
+        id: claimId,
+        issueId: params.issueId,
+        userId: params.userId,
+        status: "active",
+        claimedAt: now,
+        expiresAt,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
-  return {
-    success: true,
-    alreadyClaimedBySelf: false,
-    claim: newClaim,
-  };
+    return {
+      success: true,
+      alreadyClaimedBySelf: false,
+      claim: newClaim,
+    };
+  } catch (err: any) {
+    const fullErrStr = `${err.message || ""} ${err.cause?.message || ""} ${err.cause?.code || ""} ${err.code || ""} ${String(err)} ${String(err.cause || "")}`;
+    if (
+      fullErrStr.includes("issue_claims_active_issue_idx") ||
+      fullErrStr.includes("unique constraint") ||
+      fullErrStr.includes("duplicate key") ||
+      fullErrStr.includes("23505") ||
+      err.code === "23505" ||
+      err.cause?.code === "23505"
+    ) {
+      throw new Error("This issue was just claimed by another contributor.");
+    }
+    throw err;
+  }
 }
 
 /**
