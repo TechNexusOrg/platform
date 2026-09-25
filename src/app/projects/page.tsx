@@ -1,5 +1,6 @@
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -75,15 +76,26 @@ export default async function ProjectsPage() {
                 </p>
               </div>
 
-              <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-                <a
-                  href={`https://github.com/${project.githubRepo}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-mono text-sky-400 hover:text-sky-300 underline"
-                >
-                  GitHub Repository →
-                </a>
+              <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-400">
+                  {project.openIssuesCount || 0} open issue(s)
+                </span>
+                <div className="flex items-center gap-3">
+                  <Link
+                    href="/issues"
+                    className="text-sky-400 hover:text-sky-300 underline"
+                  >
+                    View Issues
+                  </Link>
+                  <a
+                    href={`https://github.com/${project.githubRepo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-slate-400 hover:text-white"
+                  >
+                    GitHub ↗
+                  </a>
+                </div>
               </div>
             </div>
           ))}
