@@ -8,6 +8,7 @@ import {
 } from "@/lib/credentials/engine";
 import { evaluateProgression, type ContributorLevel } from "@/lib/progression/rules";
 import { claimFoundingMembership } from "@/lib/founding";
+import { getContributorMetrics } from "@/lib/metrics";
 
 export interface ProcessContributionParams {
   userId: string;
@@ -129,23 +130,9 @@ export async function processProgressionOnContribution(
     }
   }
 
-  // 3. Gather live user metrics to evaluate promotion
-  const userContributions = await db
-    .select()
-    .from(schema.contributions)
-    .where(eq(schema.contributions.userId, params.userId));
-
-  const mergedContributions = userContributions.filter((c: any) => c.state === "merged");
-  const distinctProjects = new Set(userContributions.map((c: any) => c.projectId)).size;
-
-  const progression = evaluateProgression(previousLevel, {
-    prsOpened: userContributions.length,
-    prsMerged: mergedContributions.length,
-    issuesResolved: 0,
-    reviewsCompleted: 0,
-    projectsContributedCount: distinctProjects,
-    isOnboarded: user.isOnboarded,
-  });
+  // 3. Gather authoritative live user metrics to evaluate promotion
+  const metrics = await getContributorMetrics(params.userId, db);
+  const progression = evaluateProgression(previousLevel, metrics);
 
   let newLevel = previousLevel;
 
@@ -171,8 +158,8 @@ export async function processProgressionOnContribution(
       metadata: {
         previousLevel,
         newLevel,
-        totalPrsMerged: mergedContributions.length,
-        projectsCount: distinctProjects,
+        totalPrsMerged: metrics.prsMerged,
+        projectsCount: metrics.projectsContributedCount,
         reason: "Met objective criteria for contributor advancement",
       },
     });
@@ -200,7 +187,7 @@ export async function processProgressionOnContribution(
           prTitle: params.prTitle,
           mergedAt: params.mergedAt.toISOString(),
           verifiedAt: new Date().toISOString(),
-          additionalNotes: `Promoted to Active Contributor with ${mergedContributions.length} merged pull requests`,
+          additionalNotes: `Promoted to Active Contributor with ${metrics.prsMerged} merged pull requests`,
         };
         const meta = buildCredentialMetadata("verified_contributor", evidence);
 
