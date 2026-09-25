@@ -33,6 +33,9 @@ export async function Navbar() {
             <Link href="/issues" className="hover:text-white transition-colors">
               Issues
             </Link>
+            <Link href="/people" className="hover:text-white transition-colors">
+              Contributors
+            </Link>
           </nav>
         </div>
 

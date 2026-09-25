@@ -89,20 +89,26 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
-            href="/issues"
+            href={`/people/${sessionUser.githubUsername}`}
             className="rounded-lg bg-sky-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-sky-400 font-mono transition-colors"
           >
-            Find Issues →
+            Public Passport ↗
+          </Link>
+          <Link
+            href="/dashboard/settings"
+            className="rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-300 hover:text-white transition-colors"
+          >
+            Settings
           </Link>
           <a
             href={`https://github.com/${sessionUser.githubUsername}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-xs font-medium text-slate-300 hover:text-white transition-colors"
+            className="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-2 text-xs font-medium text-slate-400 hover:text-white transition-colors"
           >
-            GitHub Profile
+            GitHub
           </a>
         </div>
       </div>
