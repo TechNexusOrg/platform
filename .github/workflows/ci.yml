@@ -37,5 +37,5 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
-          AUTH_SECRET: 01234567890123456789012345678901
+          AUTH_SECRET: "ci_build_dummy_secret_key_strictly_for_testing_32_chars"
           APP_URL: http://localhost:3000
