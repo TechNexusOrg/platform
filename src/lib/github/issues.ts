@@ -184,6 +184,7 @@ export async function syncRepositoryIssues(
         .update(schema.issues)
         .set({
           title: ghIssue.title,
+          body: ghIssue.body || null,
           bodySnippet: ghIssue.body ? ghIssue.body.substring(0, 300) : null,
           state: ghIssue.state === "closed" ? "closed" : "open",
           labels: labelStrings,
@@ -202,6 +203,7 @@ export async function syncRepositoryIssues(
         githubIssueId: ghIssue.id,
         githubIssueNumber: ghIssue.number,
         title: ghIssue.title,
+        body: ghIssue.body || null,
         bodySnippet: ghIssue.body ? ghIssue.body.substring(0, 300) : null,
         state: "open",
         htmlUrl: ghIssue.html_url,

@@ -146,6 +146,7 @@ export const issues = pgTable(
     githubIssueId: integer("github_issue_id").notNull().unique(),
     githubIssueNumber: integer("github_issue_number").notNull(),
     title: text("title").notNull(),
+    body: text("body"),
     bodySnippet: text("body_snippet"),
     state: text("state", { enum: ["open", "closed"] })
       .default("open")

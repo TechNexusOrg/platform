@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import { evaluateProgression, type ContributorLevel } from "@/lib/progression/rules";
 import { recommendIssues } from "@/lib/recommendations/engine";
+import { expireOverdueClaims } from "@/lib/issues/claims";
 import { SyncContributionsButton } from "./SyncContributionsButton";
 import { ProgressionPath } from "./ProgressionPath";
 
@@ -54,6 +55,9 @@ export default async function DashboardPage() {
     .innerJoin(schema.projects, eq(schema.contributions.projectId, schema.projects.id))
     .where(eq(schema.contributions.userId, sessionUser.id))
     .orderBy(desc(schema.contributions.createdAt));
+
+  // Expire overdue claims across system
+  await expireOverdueClaims(db);
 
   // Fetch active issue claims
   const activeClaims = await db
