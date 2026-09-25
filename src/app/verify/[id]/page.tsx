@@ -1,7 +1,11 @@
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import type { Metadata } from "next";
+import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
+import { BadgeSnippet } from "./BadgeSnippet";
+import { RevokeButton } from "./RevokeButton";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +27,10 @@ export default async function VerifyCredentialPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+  const sessionUser = token ? await verifySessionToken(token) : null;
+
   const db = await getDb();
 
   const credRecords = await db
@@ -67,6 +75,7 @@ export default async function VerifyCredentialPage({
   const holder = holderUsers[0];
   const evidence = credential.evidenceData as any;
   const isRevoked = credential.status === "revoked";
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8 space-y-8">
@@ -74,7 +83,7 @@ export default async function VerifyCredentialPage({
       <div
         className={`rounded-2xl border p-6 sm:p-8 space-y-6 ${
           isRevoked
-            ? "border-red-500/30 bg-red-950/20"
+            ? "border-red-500/40 bg-red-950/20"
             : "border-emerald-500/30 bg-emerald-950/10"
         }`}
       >
@@ -83,7 +92,7 @@ export default async function VerifyCredentialPage({
             <div className="flex items-center gap-2">
               <span
                 className={`flex h-2 w-2 rounded-full ${
-                  isRevoked ? "bg-red-400" : "bg-emerald-400"
+                  isRevoked ? "bg-red-400 animate-pulse" : "bg-emerald-400"
                 }`}
               />
               <span
@@ -107,6 +116,18 @@ export default async function VerifyCredentialPage({
           </div>
         </div>
 
+        {/* If Revoked Banner */}
+        {isRevoked && (
+          <div className="rounded-lg border border-red-500/30 bg-red-950/40 p-4 space-y-1">
+            <div className="text-xs font-mono font-bold text-red-300 uppercase">
+              Notice of Revocation
+            </div>
+            <p className="text-xs text-red-200">
+              {credential.revokedReason || "This credential was revoked by repository maintainers."}
+            </p>
+          </div>
+        )}
+
         {/* Holder & Issuer */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 space-y-2">
@@ -125,14 +146,12 @@ export default async function VerifyCredentialPage({
                 <div className="font-bold text-white">
                   {holder?.displayName || holder?.githubUsername}
                 </div>
-                <a
-                  href={`https://github.com/${holder?.githubUsername}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={`/people/${holder?.githubUsername}`}
                   className="text-sky-400 hover:text-sky-300 font-mono text-[11px]"
                 >
-                  @{holder?.githubUsername}
-                </a>
+                  @{holder?.githubUsername} (Passport ↗)
+                </Link>
               </div>
             </div>
           </div>
@@ -192,7 +211,7 @@ export default async function VerifyCredentialPage({
             </div>
           </div>
 
-          <div className="pt-2">
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
             <a
               href={evidence?.prUrl}
               target="_blank"
@@ -202,8 +221,22 @@ export default async function VerifyCredentialPage({
               <span>Inspect PR on GitHub</span>
               <span>→</span>
             </a>
+
+            {/* Admin safety control */}
+            {sessionUser?.role === "admin" && !isRevoked && (
+              <RevokeButton credentialId={credential.id} />
+            )}
           </div>
         </div>
+
+        {/* Embeddable Badge Snippet */}
+        {!isRevoked && (
+          <BadgeSnippet
+            credentialId={credential.id}
+            title={credential.title.split("—")[0].trim()}
+            appUrl={appUrl}
+          />
+        )}
 
         {/* Anti-certificate mill disclaimer */}
         <p className="text-[11px] text-slate-500 font-mono text-center">
