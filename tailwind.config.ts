@@ -15,14 +15,20 @@ const config: Config = {
         border: "var(--border)",
         card: "var(--card)",
         "card-foreground": "var(--card-foreground)",
+        surface: {
+          raised: "var(--surface-raised)",
+          overlay: "var(--surface-overlay)",
+        },
         primary: {
-          DEFAULT: "#0284c7",
+          DEFAULT: "#0ea5e9", // Electric cyan
           foreground: "#ffffff",
-          dark: "#0369a1",
+          dark: "#0284c7",
         },
         accent: {
-          DEFAULT: "#10b981",
+          DEFAULT: "#10b981", // Electric emerald/lime
           foreground: "#ffffff",
+          violet: "#a855f7",
+          amber: "#f59e0b",
         },
         muted: {
           DEFAULT: "#1e293b",
@@ -30,8 +36,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        mono: ["var(--font-jetbrains-mono)", "monospace"],
+        sans: ["var(--font-inter)", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
       },
     },
   },

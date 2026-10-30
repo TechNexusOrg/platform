@@ -3,12 +3,12 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
 import { getInternshipPortalData } from "@/lib/internships/service";
-import { Navbar } from "@/components/Navbar";
 import { WorkLogForm } from "./WorkLogForm";
 
 export const metadata = {
   title: "Fellowship Contributor Portal — TechNexusOrg",
-  description: "Track milestones, submit weekly work logs, and review mentor evaluations.",
+  description:
+    "Track milestones, submit weekly work logs, and review mentor evaluations.",
 };
 
 export const dynamic = "force-dynamic";
@@ -31,7 +31,6 @@ export default async function InternshipPortalPage() {
   if (!portalData) {
     return (
       <div className="min-h-screen bg-[#07090e] text-slate-100">
-        <Navbar />
         <main className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-20 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-slate-400 text-2xl mb-4 border border-slate-700">
             📋
@@ -40,7 +39,8 @@ export default async function InternshipPortalPage() {
             No Active Fellowship Enrollment
           </h1>
           <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
-            You do not currently have an active fellowship enrollment. Explore our supervised engineering tracks and apply to an upcoming cohort.
+            You do not currently have an active fellowship enrollment. Explore
+            our supervised engineering tracks and apply to an upcoming cohort.
           </p>
           <div className="mt-6">
             <Link
@@ -62,12 +62,13 @@ export default async function InternshipPortalPage() {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100">
-      <Navbar />
-
       <main className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-xs font-mono text-slate-400 mb-6">
-          <Link href="/internships" className="hover:text-sky-400 transition-colors">
+          <Link
+            href="/internships"
+            className="hover:text-sky-400 transition-colors"
+          >
             Fellowships
           </Link>
           <span>/</span>
@@ -128,7 +129,8 @@ export default async function InternshipPortalPage() {
                   Assigned Engineering Mentor
                 </div>
                 <div className="text-sm font-semibold text-white">
-                  {mentor.displayName || mentor.githubUsername} (@{mentor.githubUsername})
+                  {mentor.displayName || mentor.githubUsername} (@
+                  {mentor.githubUsername})
                 </div>
               </div>
             </div>
@@ -143,7 +145,8 @@ export default async function InternshipPortalPage() {
                 Official Graduation Evaluation
               </span>
               <span className="text-xs font-mono text-slate-400">
-                Evaluated on {new Date(evaluation.evaluatedAt).toLocaleDateString()}
+                Evaluated on{" "}
+                {new Date(evaluation.evaluatedAt).toLocaleDateString()}
               </span>
             </div>
 
@@ -230,12 +233,14 @@ export default async function InternshipPortalPage() {
                     Deliverables:
                   </div>
                   <ul className="text-[11px] text-slate-400 space-y-1">
-                    {((ms.requiredDeliverables as string[]) || []).map((d, i) => (
-                      <li key={i} className="flex items-start gap-1">
-                        <span className="text-sky-400">•</span>
-                        <span>{d}</span>
-                      </li>
-                    ))}
+                    {((ms.requiredDeliverables as string[]) || []).map(
+                      (d, i) => (
+                        <li key={i} className="flex items-start gap-1">
+                          <span className="text-sky-400">•</span>
+                          <span>{d}</span>
+                        </li>
+                      ),
+                    )}
                   </ul>
                 </div>
               </div>
@@ -252,7 +257,8 @@ export default async function InternshipPortalPage() {
                 Submit Weekly Work Log
               </h2>
               <p className="text-xs text-slate-400 mb-4">
-                Record your hours and link merged or active GitHub PRs for maintainer review.
+                Record your hours and link merged or active GitHub PRs for
+                maintainer review.
               </p>
               <WorkLogForm enrollmentId={enrollment.id} />
             </div>
@@ -270,7 +276,8 @@ export default async function InternshipPortalPage() {
 
             {workLogs.length === 0 ? (
               <p className="text-xs text-slate-500 font-mono text-center py-8">
-                No work logs submitted yet. Submit your first weekly log using the form.
+                No work logs submitted yet. Submit your first weekly log using
+                the form.
               </p>
             ) : (
               <div className="space-y-4">
@@ -297,24 +304,28 @@ export default async function InternshipPortalPage() {
                         <div className="text-[10px] font-mono text-slate-500 uppercase">
                           Linked Pull Requests:
                         </div>
-                        {((log.pullRequestUrls as string[]) || []).map((pr, i) => (
-                          <div key={i}>
-                            <a
-                              href={pr}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs font-mono text-emerald-400 underline hover:text-emerald-300"
-                            >
-                              {pr}
-                            </a>
-                          </div>
-                        ))}
+                        {((log.pullRequestUrls as string[]) || []).map(
+                          (pr, i) => (
+                            <div key={i}>
+                              <a
+                                href={pr}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-mono text-emerald-400 underline hover:text-emerald-300"
+                              >
+                                {pr}
+                              </a>
+                            </div>
+                          ),
+                        )}
                       </div>
                     )}
 
                     {log.blockers && (
                       <div className="mt-2 text-xs text-amber-300 bg-amber-950/20 p-2 rounded border border-amber-500/20">
-                        <span className="font-semibold font-mono">Blockers: </span>
+                        <span className="font-semibold font-mono">
+                          Blockers:{" "}
+                        </span>
                         {log.blockers}
                       </div>
                     )}

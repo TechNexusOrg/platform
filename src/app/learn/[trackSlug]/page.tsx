@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
 import { getTrackBySlug } from "@/lib/learning/service";
-import { Navbar } from "@/components/Navbar";
 
 interface TrackPageProps {
   params: Promise<{
@@ -48,12 +47,13 @@ export default async function TrackDetailPage({ params }: TrackPageProps) {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100">
-      <Navbar />
-
       <main className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-xs font-mono text-slate-400 mb-6">
-          <Link href="/learn" className="hover:text-emerald-400 transition-colors">
+          <Link
+            href="/learn"
+            className="hover:text-emerald-400 transition-colors"
+          >
             Tracks
           </Link>
           <span>/</span>
@@ -68,8 +68,8 @@ export default async function TrackDetailPage({ params }: TrackPageProps) {
                 track.difficulty === "beginner"
                   ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                   : track.difficulty === "intermediate"
-                  ? "bg-sky-500/10 text-sky-400 border border-sky-500/30"
-                  : "bg-purple-500/10 text-purple-400 border border-purple-500/30"
+                    ? "bg-sky-500/10 text-sky-400 border border-sky-500/30"
+                    : "bg-purple-500/10 text-purple-400 border border-purple-500/30"
               }`}
             >
               {track.difficulty}
@@ -95,7 +95,8 @@ export default async function TrackDetailPage({ params }: TrackPageProps) {
             <div className="mt-6 pt-6 border-t border-slate-800/80">
               <div className="flex items-center justify-between text-xs font-mono mb-2">
                 <span className="text-slate-400">
-                  {track.completedLessonsCount} of {track.lessonCount} lessons completed
+                  {track.completedLessonsCount} of {track.lessonCount} lessons
+                  completed
                 </span>
                 <span className="font-semibold text-emerald-400">
                   {track.progressPercentage}%

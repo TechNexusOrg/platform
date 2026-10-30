@@ -43,7 +43,9 @@ export const users = pgTable(
     foundingNumber: integer("founding_number").unique(),
     isOnboarded: boolean("is_onboarded").default(false).notNull(),
     isPublic: boolean("is_public").default(false).notNull(),
-    publicConsentGivenAt: timestamp("public_consent_given_at", { withTimezone: true }),
+    publicConsentGivenAt: timestamp("public_consent_given_at", {
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -56,7 +58,7 @@ export const users = pgTable(
     uniqueIndex("users_github_username_idx").on(table.githubUsername),
     index("users_role_idx").on(table.role),
     index("users_level_idx").on(table.level),
-  ]
+  ],
 );
 
 // --- CONTRIBUTOR PROFILES ---
@@ -79,14 +81,8 @@ export const profiles = pgTable(
       .$type<string[]>()
       .default([])
       .notNull(),
-    technologies: jsonb("technologies")
-      .$type<string[]>()
-      .default([])
-      .notNull(),
-    tools: jsonb("tools")
-      .$type<string[]>()
-      .default([])
-      .notNull(),
+    technologies: jsonb("technologies").$type<string[]>().default([]).notNull(),
+    tools: jsonb("tools").$type<string[]>().default([]).notNull(),
     contributionPreferences: jsonb("contribution_preferences")
       .$type<string[]>()
       .default([])
@@ -97,7 +93,7 @@ export const profiles = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [uniqueIndex("profiles_user_id_idx").on(table.userId)]
+  (table) => [uniqueIndex("profiles_user_id_idx").on(table.userId)],
 );
 
 // --- PROJECTS ---
@@ -120,7 +116,9 @@ export const projects = pgTable(
       .notNull(),
     maintainerId: text("maintainer_id").references(() => users.id),
     isOfficial: boolean("is_official").default(false).notNull(),
-    contributionEnabled: boolean("contribution_enabled").default(false).notNull(),
+    contributionEnabled: boolean("contribution_enabled")
+      .default(false)
+      .notNull(),
     firstPrEnabled: boolean("first_pr_enabled").default(false).notNull(),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     starsCount: integer("stars_count").default(0).notNull(),
@@ -138,7 +136,7 @@ export const projects = pgTable(
     uniqueIndex("projects_repo_idx").on(table.githubRepo),
     index("projects_github_repo_id_idx").on(table.githubRepoId),
     index("projects_github_owner_id_idx").on(table.githubOwnerId),
-  ]
+  ],
 );
 
 // --- ISSUES ---
@@ -165,7 +163,10 @@ export const issues = pgTable(
       .default("unclassified")
       .notNull(),
     estimatedEffort: text("estimated_effort"), // e.g. "2-4 hours"
-    skillsRequired: jsonb("skills_required").$type<string[]>().default([]).notNull(),
+    skillsRequired: jsonb("skills_required")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
     isGoodFirstIssue: boolean("is_good_first_issue").default(false).notNull(),
     isHelpWanted: boolean("is_help_wanted").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -179,7 +180,7 @@ export const issues = pgTable(
     uniqueIndex("issues_github_issue_id_idx").on(table.githubIssueId),
     index("issues_project_id_idx").on(table.projectId),
     index("issues_difficulty_idx").on(table.difficulty),
-  ]
+  ],
 );
 
 // --- CONTRIBUTIONS ---
@@ -204,7 +205,9 @@ export const contributions = pgTable(
     isFirstPr: boolean("is_first_pr").default(false).notNull(),
     mergedAt: timestamp("merged_at", { withTimezone: true }),
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
-    verificationSource: text("verification_source").default("github_webhook").notNull(),
+    verificationSource: text("verification_source")
+      .default("github_webhook")
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -218,7 +221,7 @@ export const contributions = pgTable(
     index("contributions_claim_id_idx").on(table.claimId),
     index("contributions_state_idx").on(table.state),
     uniqueIndex("contributions_pr_url_idx").on(table.prUrl),
-  ]
+  ],
 );
 
 // --- VERIFIABLE CREDENTIALS ---
@@ -266,7 +269,7 @@ export const credentials = pgTable(
     index("credentials_user_id_idx").on(table.userId),
     index("credentials_type_idx").on(table.type),
     index("credentials_status_idx").on(table.status),
-  ]
+  ],
 );
 
 // --- FOUNDING 1,000 REGISTRY ---
@@ -293,7 +296,7 @@ export const foundingMembers = pgTable(
   (table) => [
     uniqueIndex("founding_members_number_idx").on(table.memberNumber),
     uniqueIndex("founding_members_user_id_idx").on(table.userId),
-  ]
+  ],
 );
 
 // --- AUDIT LOGS ---
@@ -315,7 +318,7 @@ export const auditLogs = pgTable(
     index("audit_logs_actor_id_idx").on(table.actorId),
     index("audit_logs_action_idx").on(table.action),
     index("audit_logs_target_idx").on(table.targetType, table.targetId),
-  ]
+  ],
 );
 
 // --- ISSUE CLAIMS ---
@@ -353,7 +356,7 @@ export const issueClaims = pgTable(
     index("issue_claims_issue_id_idx").on(table.issueId),
     index("issue_claims_user_id_idx").on(table.userId),
     index("issue_claims_status_idx").on(table.status),
-  ]
+  ],
 );
 
 // --- PULL REQUESTS ---
@@ -361,15 +364,20 @@ export const pullRequests = pgTable(
   "pull_requests",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id")
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
     projectId: text("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     issueId: text("issue_id").references(() => issues.id),
     claimId: text("claim_id").references(() => issueClaims.id),
     associationStatus: text("association_status", {
-      enum: ["claimed", "explicit_reference", "inferred", "ambiguous", "unlinked"],
+      enum: [
+        "claimed",
+        "explicit_reference",
+        "inferred",
+        "ambiguous",
+        "unlinked",
+      ],
     })
       .default("unlinked")
       .notNull(),
@@ -404,7 +412,7 @@ export const pullRequests = pgTable(
     index("pull_requests_issue_id_idx").on(table.issueId),
     index("pull_requests_claim_id_idx").on(table.claimId),
     index("pull_requests_state_idx").on(table.state),
-  ]
+  ],
 );
 
 // --- PULL REQUEST REVIEWS ---
@@ -433,7 +441,7 @@ export const pullRequestReviews = pgTable(
     index("pr_reviews_pull_request_id_idx").on(table.pullRequestId),
     index("pr_reviews_reviewer_username_idx").on(table.reviewerUsername),
     index("pr_reviews_review_state_idx").on(table.reviewState),
-  ]
+  ],
 );
 
 // --- GITHUB WEBHOOK DELIVERIES (IDEMPOTENCY) ---
@@ -448,7 +456,9 @@ export const githubWebhookDeliveries = pgTable(
       .defaultNow()
       .notNull(),
     processedAt: timestamp("processed_at", { withTimezone: true }),
-    status: text("status", { enum: ["received", "processing", "processed", "ignored", "error"] })
+    status: text("status", {
+      enum: ["received", "processing", "processed", "ignored", "error"],
+    })
       .default("received")
       .notNull(),
     error: text("error"),
@@ -456,14 +466,17 @@ export const githubWebhookDeliveries = pgTable(
   (table) => [
     uniqueIndex("webhook_deliveries_delivery_id_idx").on(table.deliveryId),
     index("webhook_deliveries_status_idx").on(table.status),
-  ]
+  ],
 );
 
 // --- FOUNDING ALLOCATION COUNTER (ATOMIC SEQUENCE) ---
-export const foundingAllocationCounter = pgTable("founding_allocation_counter", {
-  id: text("id").primaryKey(),
-  currentNumber: integer("current_number").default(0).notNull(),
-});
+export const foundingAllocationCounter = pgTable(
+  "founding_allocation_counter",
+  {
+    id: text("id").primaryKey(),
+    currentNumber: integer("current_number").default(0).notNull(),
+  },
+);
 
 // --- NOTIFICATIONS ---
 export const notifications = pgTable(
@@ -485,7 +498,7 @@ export const notifications = pgTable(
   (table) => [
     index("notifications_user_id_idx").on(table.userId),
     index("notifications_is_read_idx").on(table.isRead),
-  ]
+  ],
 );
 
 // --- MENTOR REQUESTS ---
@@ -502,7 +515,9 @@ export const mentorRequests = pgTable(
       .references(() => issues.id, { onDelete: "cascade" }),
     message: text("message").notNull(),
     reply: text("reply"),
-    status: text("status", { enum: ["open", "in_progress", "resolved", "closed"] })
+    status: text("status", {
+      enum: ["open", "in_progress", "resolved", "closed"],
+    })
       .default("open")
       .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -515,7 +530,7 @@ export const mentorRequests = pgTable(
     index("mentor_requests_mentor_id_idx").on(table.mentorId),
     index("mentor_requests_issue_id_idx").on(table.issueId),
     index("mentor_requests_status_idx").on(table.status),
-  ]
+  ],
 );
 
 // --- LEARNING TRACKS ---
@@ -526,12 +541,17 @@ export const learningTracks = pgTable(
     slug: text("slug").notNull().unique(),
     title: text("title").notNull(),
     description: text("description").notNull(),
-    difficulty: text("difficulty", { enum: ["beginner", "intermediate", "advanced"] })
+    difficulty: text("difficulty", {
+      enum: ["beginner", "intermediate", "advanced"],
+    })
       .default("beginner")
       .notNull(),
     estimatedHours: integer("estimated_hours").default(10).notNull(),
     isPublished: boolean("is_published").default(false).notNull(),
-    prerequisites: jsonb("prerequisites").$type<string[]>().default([]).notNull(),
+    prerequisites: jsonb("prerequisites")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
     objectives: jsonb("objectives").$type<string[]>().default([]).notNull(),
     orderIndex: integer("order_index").default(0).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -544,7 +564,7 @@ export const learningTracks = pgTable(
   (table) => [
     uniqueIndex("learning_tracks_slug_idx").on(table.slug),
     index("learning_tracks_is_published_idx").on(table.isPublished),
-  ]
+  ],
 );
 
 // --- LEARNING MODULES ---
@@ -569,7 +589,7 @@ export const learningModules = pgTable(
   (table) => [
     index("learning_modules_track_id_idx").on(table.trackId),
     index("learning_modules_order_idx").on(table.trackId, table.orderIndex),
-  ]
+  ],
 );
 
 // --- LEARNING LESSONS ---
@@ -595,7 +615,7 @@ export const learningLessons = pgTable(
   (table) => [
     index("learning_lessons_module_id_idx").on(table.moduleId),
     index("learning_lessons_order_idx").on(table.moduleId, table.orderIndex),
-  ]
+  ],
 );
 
 // --- LEARNING ENROLLMENTS ---
@@ -621,10 +641,13 @@ export const learningEnrollments = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("learning_enrollments_user_track_idx").on(table.userId, table.trackId),
+    uniqueIndex("learning_enrollments_user_track_idx").on(
+      table.userId,
+      table.trackId,
+    ),
     index("learning_enrollments_user_id_idx").on(table.userId),
     index("learning_enrollments_track_id_idx").on(table.trackId),
-  ]
+  ],
 );
 
 // --- LESSON PROGRESS ---
@@ -644,10 +667,13 @@ export const lessonProgress = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("lesson_progress_user_lesson_idx").on(table.userId, table.lessonId),
+    uniqueIndex("lesson_progress_user_lesson_idx").on(
+      table.userId,
+      table.lessonId,
+    ),
     index("lesson_progress_user_id_idx").on(table.userId),
     index("lesson_progress_lesson_id_idx").on(table.lessonId),
-  ]
+  ],
 );
 
 // --- LEARNING ASSIGNMENTS ---
@@ -660,7 +686,10 @@ export const learningAssignments = pgTable(
       .references(() => learningLessons.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     description: text("description").notNull(),
-    acceptanceCriteria: jsonb("acceptance_criteria").$type<string[]>().default([]).notNull(),
+    acceptanceCriteria: jsonb("acceptance_criteria")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
     submissionType: text("submission_type", {
       enum: ["github_pr", "text_submission", "terminal_output"],
     })
@@ -670,7 +699,7 @@ export const learningAssignments = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [index("learning_assignments_lesson_id_idx").on(table.lessonId)]
+  (table) => [index("learning_assignments_lesson_id_idx").on(table.lessonId)],
 );
 
 // --- ASSIGNMENT SUBMISSIONS ---
@@ -685,7 +714,9 @@ export const assignmentSubmissions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
-    status: text("status", { enum: ["submitted", "approved", "needs_revision"] })
+    status: text("status", {
+      enum: ["submitted", "approved", "needs_revision"],
+    })
       .default("submitted")
       .notNull(),
     reviewedBy: text("reviewed_by").references(() => users.id),
@@ -699,7 +730,7 @@ export const assignmentSubmissions = pgTable(
     index("assignment_submissions_user_idx").on(table.userId),
     index("assignment_submissions_assignment_idx").on(table.assignmentId),
     index("assignment_submissions_status_idx").on(table.status),
-  ]
+  ],
 );
 
 // --- INTERNSHIP PROGRAMS ---
@@ -710,15 +741,26 @@ export const internshipPrograms = pgTable(
     slug: text("slug").notNull().unique(),
     title: text("title").notNull(),
     track: text("track", {
-      enum: ["systems", "web_fullstack", "devops_infra", "developer_experience"],
+      enum: [
+        "systems",
+        "web_fullstack",
+        "devops_infra",
+        "developer_experience",
+      ],
     })
       .default("systems")
       .notNull(),
     description: text("description").notNull(),
     durationWeeks: integer("duration_weeks").default(8).notNull(),
     isPublished: boolean("is_published").default(true).notNull(),
-    prerequisites: jsonb("prerequisites").$type<string[]>().default([]).notNull(),
-    learningOutcomes: jsonb("learning_outcomes").$type<string[]>().default([]).notNull(),
+    prerequisites: jsonb("prerequisites")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
+    learningOutcomes: jsonb("learning_outcomes")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -729,7 +771,7 @@ export const internshipPrograms = pgTable(
   (table) => [
     uniqueIndex("internship_programs_slug_idx").on(table.slug),
     index("internship_programs_is_published_idx").on(table.isPublished),
-  ]
+  ],
 );
 
 // --- COHORTS ---
@@ -757,7 +799,7 @@ export const cohorts = pgTable(
   (table) => [
     index("cohorts_program_id_idx").on(table.programId),
     index("cohorts_status_idx").on(table.status),
-  ]
+  ],
 );
 
 // --- INTERNSHIP APPLICATIONS ---
@@ -768,7 +810,9 @@ export const internshipApplications = pgTable(
     programId: text("program_id")
       .notNull()
       .references(() => internshipPrograms.id, { onDelete: "cascade" }),
-    cohortId: text("cohort_id").references(() => cohorts.id, { onDelete: "set null" }),
+    cohortId: text("cohort_id").references(() => cohorts.id, {
+      onDelete: "set null",
+    }),
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -792,7 +836,7 @@ export const internshipApplications = pgTable(
     index("internship_applications_user_idx").on(table.userId),
     index("internship_applications_program_idx").on(table.programId),
     index("internship_applications_status_idx").on(table.status),
-  ]
+  ],
 );
 
 // --- INTERNSHIP ENROLLMENTS ---
@@ -803,7 +847,9 @@ export const internshipEnrollments = pgTable(
     programId: text("program_id")
       .notNull()
       .references(() => internshipPrograms.id, { onDelete: "cascade" }),
-    cohortId: text("cohort_id").references(() => cohorts.id, { onDelete: "set null" }),
+    cohortId: text("cohort_id").references(() => cohorts.id, {
+      onDelete: "set null",
+    }),
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -818,7 +864,9 @@ export const internshipEnrollments = pgTable(
     startDate: timestamp("start_date", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    targetEndDate: timestamp("target_end_date", { withTimezone: true }).notNull(),
+    targetEndDate: timestamp("target_end_date", {
+      withTimezone: true,
+    }).notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -828,11 +876,14 @@ export const internshipEnrollments = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("internship_enrollments_user_prog_idx").on(table.userId, table.programId),
+    uniqueIndex("internship_enrollments_user_prog_idx").on(
+      table.userId,
+      table.programId,
+    ),
     index("internship_enrollments_user_idx").on(table.userId),
     index("internship_enrollments_mentor_idx").on(table.mentorId),
     index("internship_enrollments_status_idx").on(table.status),
-  ]
+  ],
 );
 
 // --- INTERNSHIP MILESTONES ---
@@ -846,13 +897,19 @@ export const internshipMilestones = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull(),
     weekNumber: integer("week_number").notNull(),
-    requiredDeliverables: jsonb("required_deliverables").$type<string[]>().default([]).notNull(),
+    requiredDeliverables: jsonb("required_deliverables")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
     orderIndex: integer("order_index").default(0).notNull(),
   },
   (table) => [
     index("internship_milestones_program_idx").on(table.programId),
-    index("internship_milestones_week_idx").on(table.programId, table.weekNumber),
-  ]
+    index("internship_milestones_week_idx").on(
+      table.programId,
+      table.weekNumber,
+    ),
+  ],
 );
 
 // --- INTERNSHIP WORK LOGS ---
@@ -869,7 +926,10 @@ export const internshipWorkLogs = pgTable(
     weekNumber: integer("week_number").notNull(),
     hoursSpent: integer("hours_spent").notNull(),
     summary: text("summary").notNull(),
-    pullRequestUrls: jsonb("pull_request_urls").$type<string[]>().default([]).notNull(),
+    pullRequestUrls: jsonb("pull_request_urls")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
     blockers: text("blockers"),
     mentorFeedback: text("mentor_feedback"),
     mentorReviewedAt: timestamp("mentor_reviewed_at", { withTimezone: true }),
@@ -880,8 +940,11 @@ export const internshipWorkLogs = pgTable(
   (table) => [
     index("internship_work_logs_enrollment_idx").on(table.enrollmentId),
     index("internship_work_logs_user_idx").on(table.userId),
-    index("internship_work_logs_week_idx").on(table.enrollmentId, table.weekNumber),
-  ]
+    index("internship_work_logs_week_idx").on(
+      table.enrollmentId,
+      table.weekNumber,
+    ),
+  ],
 );
 
 // --- INTERNSHIP EVALUATIONS ---
@@ -901,7 +964,9 @@ export const internshipEvaluations = pgTable(
     documentationScore: integer("documentation_score").notNull(),
     technicalInitiativeScore: integer("technical_initiative_score").notNull(),
     overallFeedback: text("overall_feedback").notNull(),
-    recommendCompletion: boolean("recommend_completion").default(true).notNull(),
+    recommendCompletion: boolean("recommend_completion")
+      .default(true)
+      .notNull(),
     evaluatedAt: timestamp("evaluated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -909,5 +974,50 @@ export const internshipEvaluations = pgTable(
   (table) => [
     uniqueIndex("internship_evaluations_enrollment_idx").on(table.enrollmentId),
     index("internship_evaluations_mentor_idx").on(table.mentorId),
-  ]
+  ],
+);
+
+// --- PARTNER PROPOSALS TABLE ---
+export const partnerProposals = pgTable(
+  "partner_proposals",
+  {
+    id: text("id").primaryKey(),
+    organizationName: text("organization_name").notNull(),
+    contactName: text("contact_name").notNull(),
+    contactEmail: text("contact_email").notNull(),
+    partnerType: text("partner_type", {
+      enum: ["university", "company", "open_source_collective", "other"],
+    }).notNull(),
+    proposalType: text("proposal_type", {
+      enum: [
+        "project_partnership",
+        "cohort_sponsorship",
+        "mentorship_program",
+        "hiring_pipeline",
+      ],
+    }).notNull(),
+    summary: text("summary").notNull(),
+    targetTechnologies: jsonb("target_technologies")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
+    estimatedStudentCapacity: integer("estimated_student_capacity")
+      .default(10)
+      .notNull(),
+    status: text("status", {
+      enum: ["submitted", "under_review", "accepted", "declined"],
+    })
+      .default("submitted")
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("partner_proposals_status_idx").on(table.status),
+    index("partner_proposals_created_at_idx").on(table.createdAt),
+  ],
 );

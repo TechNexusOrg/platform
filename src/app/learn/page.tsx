@@ -2,7 +2,6 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
 import { listTracks } from "@/lib/learning/service";
-import { Navbar } from "@/components/Navbar";
 
 export const metadata = {
   title: "Learning Tracks — TechNexusOrg",
@@ -21,8 +20,6 @@ export default async function LearnPage() {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100">
-      <Navbar />
-
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         {/* Header section */}
         <div className="max-w-3xl">
@@ -34,8 +31,9 @@ export default async function LearnPage() {
             Structured Learning Tracks
           </h1>
           <p className="mt-3 text-base sm:text-lg text-slate-400 leading-relaxed">
-            Bridge academic theory and production software engineering. Each track contains
-            hands-on terminal exercises, internal architecture deep-dives, and verifiable capstone assignments.
+            Bridge academic theory and production software engineering. Each
+            track contains hands-on terminal exercises, internal architecture
+            deep-dives, and verifiable capstone assignments.
           </p>
         </div>
 
@@ -58,8 +56,8 @@ export default async function LearnPage() {
                         track.difficulty === "beginner"
                           ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                           : track.difficulty === "intermediate"
-                          ? "bg-sky-500/10 text-sky-400 border border-sky-500/30"
-                          : "bg-purple-500/10 text-purple-400 border border-purple-500/30"
+                            ? "bg-sky-500/10 text-sky-400 border border-sky-500/30"
+                            : "bg-purple-500/10 text-purple-400 border border-purple-500/30"
                       }`}
                     >
                       {track.difficulty}
@@ -68,7 +66,8 @@ export default async function LearnPage() {
                       ⏱ {track.estimatedHours} hrs
                     </span>
                     <span className="px-2.5 py-0.5 rounded text-xs font-mono text-slate-400 bg-slate-800/60 border border-slate-700/50">
-                      📚 {track.moduleCount} modules • {track.lessonCount} lessons
+                      📚 {track.moduleCount} modules • {track.lessonCount}{" "}
+                      lessons
                     </span>
                   </div>
 
@@ -135,8 +134,8 @@ export default async function LearnPage() {
                     {isCompleted
                       ? "Review Track Syllabus →"
                       : isInProgress
-                      ? "Continue Learning →"
-                      : "Explore Syllabus →"}
+                        ? "Continue Learning →"
+                        : "Explore Syllabus →"}
                   </Link>
                 </div>
               </div>
