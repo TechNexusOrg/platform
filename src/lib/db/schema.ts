@@ -237,6 +237,9 @@ export const credentials = pgTable(
         "founding_1000",
         "maintainer",
         "mentor",
+        "learning_track_completion",
+        "internship_completion",
+        "cohort_completion",
       ],
     }).notNull(),
     title: text("title").notNull(),
@@ -250,6 +253,9 @@ export const credentials = pgTable(
       .notNull(),
     evidenceData: jsonb("evidence_data").notNull(), // contains PR URL, repository, commit SHA, verification timestamp
     verificationUrl: text("verification_url").notNull(),
+    signature: text("signature"),
+    signingKeyId: text("signing_key_id"),
+    canonicalHash: text("canonical_hash"),
     revokedReason: text("revoked_reason"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
