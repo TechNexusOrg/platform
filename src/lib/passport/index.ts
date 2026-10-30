@@ -1,5 +1,5 @@
 import { getDb, schema } from "@/lib/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 export interface PassportTimelineItem {
   id: string;
@@ -117,7 +117,12 @@ export async function getContributorPassport(
     })
     .from(schema.contributions)
     .innerJoin(schema.projects, eq(schema.contributions.projectId, schema.projects.id))
-    .where(eq(schema.contributions.userId, user.id))
+    .where(
+      and(
+        eq(schema.contributions.userId, user.id),
+        eq(schema.projects.isOfficial, true)
+      )
+    )
     .orderBy(desc(schema.contributions.createdAt));
 
   // Fetch credentials

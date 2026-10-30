@@ -72,16 +72,27 @@ export async function getContributorMetrics(
   const mergedContributions = deduplicatedContributions.filter((c: any) => c.state === "merged");
   const uniqueOfficialProjects = new Set(mergedContributions.map((c: any) => c.projectId));
 
-  // 3. Fetch completed issue claims
+  // 3. Fetch completed issue claims on verified official projects only
   const completedClaims = await db
-    .select({ id: schema.issueClaims.id })
+    .select({
+      id: schema.issueClaims.id,
+      isOfficial: schema.projects.isOfficial,
+      contributionEnabled: schema.projects.contributionEnabled,
+      approvedAt: schema.projects.approvedAt,
+    })
     .from(schema.issueClaims)
+    .innerJoin(schema.issues, eq(schema.issueClaims.issueId, schema.issues.id))
+    .innerJoin(schema.projects, eq(schema.issues.projectId, schema.projects.id))
     .where(
       and(
         eq(schema.issueClaims.userId, userId),
         eq(schema.issueClaims.status, "completed")
       )
     );
+
+  const validCompletedClaims = completedClaims.filter(
+    (c: any) => c.isOfficial && c.contributionEnabled && c.approvedAt
+  );
 
   // 4. Fetch code reviews completed by this user
   // Avoid self-review, avoid dismissed reviews, avoid duplicate review events on the same PR
@@ -138,7 +149,7 @@ export async function getContributorMetrics(
   return {
     prsOpened: deduplicatedContributions.length,
     prsMerged: mergedContributions.length,
-    issuesResolved: completedClaims.length,
+    issuesResolved: validCompletedClaims.length,
     reviewsCompleted: eligibleReviewedPrIds.size,
     projectsContributedCount: uniqueOfficialProjects.size,
     isOnboarded: Boolean(user.isOnboarded),

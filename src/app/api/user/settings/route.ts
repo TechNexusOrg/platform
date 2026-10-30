@@ -10,7 +10,7 @@ const settingsSchema = z.object({
   location: z.string().max(100).optional(),
   portfolioUrl: z.string().url().or(z.literal("")).optional(),
   linkedinUrl: z.string().url().or(z.literal("")).optional(),
-  isPublic: z.boolean().default(true),
+  isPublic: z.boolean().default(false),
   skills: z.array(z.string()).default([]),
 });
 
@@ -29,8 +29,9 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const data = settingsSchema.parse(body);
     const db = await getDb();
+    const now = new Date();
 
-    // Update user record
+    // Update user record and track public consent timestamp
     await db
       .update(schema.users)
       .set({
@@ -40,7 +41,8 @@ export async function PATCH(request: NextRequest) {
         portfolioUrl: data.portfolioUrl || null,
         linkedinUrl: data.linkedinUrl || null,
         isPublic: data.isPublic,
-        updatedAt: new Date(),
+        publicConsentGivenAt: data.isPublic ? now : null,
+        updatedAt: now,
       })
       .where(eq(schema.users.id, sessionUser.id));
 

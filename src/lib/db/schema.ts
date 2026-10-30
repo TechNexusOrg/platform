@@ -42,7 +42,8 @@ export const users = pgTable(
       .notNull(),
     foundingNumber: integer("founding_number").unique(),
     isOnboarded: boolean("is_onboarded").default(false).notNull(),
-    isPublic: boolean("is_public").default(true).notNull(),
+    isPublic: boolean("is_public").default(false).notNull(),
+    publicConsentGivenAt: timestamp("public_consent_given_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
