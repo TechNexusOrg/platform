@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
 import { getLesson } from "@/lib/learning/service";
-import { Navbar } from "@/components/Navbar";
 import { LessonViewer } from "./LessonViewer";
 
 interface LessonPageProps {
@@ -39,7 +38,6 @@ export default async function LessonPage({ params }: LessonPageProps) {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100">
-      <Navbar />
       <main>
         <LessonViewer lesson={lesson} isLoggedIn={!!user} />
       </main>

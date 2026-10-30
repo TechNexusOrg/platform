@@ -4,7 +4,10 @@ import Link from "next/link";
 import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db";
 import { eq, and, or, desc } from "drizzle-orm";
-import { evaluateProgression, type ContributorLevel } from "@/lib/progression/rules";
+import {
+  evaluateProgression,
+  type ContributorLevel,
+} from "@/lib/progression/rules";
 import { recommendIssues } from "@/lib/recommendations/engine";
 import { expireOverdueClaims } from "@/lib/issues/claims";
 import { SyncContributionsButton } from "./SyncContributionsButton";
@@ -52,7 +55,10 @@ export default async function DashboardPage() {
       projectId: schema.projects.id,
     })
     .from(schema.contributions)
-    .innerJoin(schema.projects, eq(schema.contributions.projectId, schema.projects.id))
+    .innerJoin(
+      schema.projects,
+      eq(schema.contributions.projectId, schema.projects.id),
+    )
     .where(eq(schema.contributions.userId, sessionUser.id))
     .orderBy(desc(schema.contributions.createdAt));
 
@@ -80,8 +86,8 @@ export default async function DashboardPage() {
     .where(
       and(
         eq(schema.issueClaims.userId, sessionUser.id),
-        eq(schema.issueClaims.status, "active")
-      )
+        eq(schema.issueClaims.status, "active"),
+      ),
     );
 
   // Fetch live credentials
@@ -91,6 +97,45 @@ export default async function DashboardPage() {
     .where(eq(schema.credentials.userId, sessionUser.id))
     .orderBy(desc(schema.credentials.issuedAt));
 
+  // Fetch active learning track enrollments
+  const userTrackEnrollments = await db
+    .select({
+      id: schema.learningEnrollments.id,
+      status: schema.learningEnrollments.status,
+      enrolledAt: schema.learningEnrollments.enrolledAt,
+      completedAt: schema.learningEnrollments.completedAt,
+      trackTitle: schema.learningTracks.title,
+      trackSlug: schema.learningTracks.slug,
+      difficulty: schema.learningTracks.difficulty,
+      estimatedHours: schema.learningTracks.estimatedHours,
+    })
+    .from(schema.learningEnrollments)
+    .innerJoin(
+      schema.learningTracks,
+      eq(schema.learningEnrollments.trackId, schema.learningTracks.id),
+    )
+    .where(eq(schema.learningEnrollments.userId, sessionUser.id));
+
+  // Fetch active fellowship enrollment
+  const userFellowships = await db
+    .select({
+      id: schema.internshipEnrollments.id,
+      status: schema.internshipEnrollments.status,
+      startDate: schema.internshipEnrollments.startDate,
+      programTitle: schema.internshipPrograms.title,
+      programTrack: schema.internshipPrograms.track,
+      durationWeeks: schema.internshipPrograms.durationWeeks,
+    })
+    .from(schema.internshipEnrollments)
+    .innerJoin(
+      schema.internshipPrograms,
+      eq(schema.internshipEnrollments.programId, schema.internshipPrograms.id),
+    )
+    .where(eq(schema.internshipEnrollments.userId, sessionUser.id))
+    .limit(1);
+
+  const activeFellowship = userFellowships[0] || null;
+
   // Fetch user profile details
   const userProfiles = await db
     .select()
@@ -99,7 +144,9 @@ export default async function DashboardPage() {
     .limit(1);
 
   const profile = userProfiles[0];
-  const mergedCount = userContributions.filter((c: any) => c.state === "merged").length;
+  const mergedCount = userContributions.filter(
+    (c: any) => c.state === "merged",
+  ).length;
 
   // Real database metrics for progression calculation
   const completedClaims = await db
@@ -108,8 +155,8 @@ export default async function DashboardPage() {
     .where(
       and(
         eq(schema.issueClaims.userId, sessionUser.id),
-        eq(schema.issueClaims.status, "completed")
-      )
+        eq(schema.issueClaims.status, "completed"),
+      ),
     );
 
   const userReviews = await db
@@ -120,9 +167,9 @@ export default async function DashboardPage() {
         eq(schema.pullRequestReviews.reviewerGithubId, sessionUser.githubId),
         or(
           eq(schema.pullRequestReviews.reviewState, "approved"),
-          eq(schema.pullRequestReviews.reviewState, "changes_requested")
-        )
-      )
+          eq(schema.pullRequestReviews.reviewState, "changes_requested"),
+        ),
+      ),
     );
 
   const userOpenedPrs = await db
@@ -139,7 +186,9 @@ export default async function DashboardPage() {
     prsMerged: mergedCount,
     issuesResolved,
     reviewsCompleted,
-    projectsContributedCount: new Set(userContributions.map((c: any) => c.projectId)).size,
+    projectsContributedCount: new Set(
+      userContributions.map((c: any) => c.projectId),
+    ).size,
     isOnboarded: sessionUser.isOnboarded,
   });
 
@@ -169,7 +218,7 @@ export default async function DashboardPage() {
   const mappedExpLevel =
     profile?.experienceLevel === "complete_beginner"
       ? "beginner"
-      : ((profile?.experienceLevel as any) || "beginner");
+      : (profile?.experienceLevel as any) || "beginner";
 
   const recommended = profile
     ? recommendIssues(
@@ -184,7 +233,7 @@ export default async function DashboardPage() {
           preferredLanguages: profile.preferredLanguages || [],
           contributionPreferences: profile.contributionPreferences || [],
         },
-        5
+        5,
       )
     : [];
 
@@ -213,7 +262,8 @@ export default async function DashboardPage() {
               </span>
               {sessionUser.foundingNumber && (
                 <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-mono font-bold text-amber-300">
-                  Founding Member #{String(sessionUser.foundingNumber).padStart(4, "0")}
+                  Founding Member #
+                  {String(sessionUser.foundingNumber).padStart(4, "0")}
                 </span>
               )}
             </div>
@@ -248,6 +298,35 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Active Fellowship Banner */}
+      {activeFellowship && (
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 backdrop-blur-md">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-mono font-semibold uppercase text-emerald-400">
+                Active Fellowship:{" "}
+                {activeFellowship.programTrack.replace("_", " ")}
+              </span>
+            </div>
+            <h3 className="text-lg font-bold text-white font-mono">
+              {activeFellowship.programTitle}
+            </h3>
+            <p className="text-xs text-slate-300">
+              Duration: {activeFellowship.durationWeeks} weeks • Supervised
+              open-source fellowship
+            </p>
+          </div>
+          <Link
+            href="/internships/portal"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-mono font-bold text-slate-950 hover:bg-emerald-400 transition-colors shadow-sm"
+          >
+            <span>Open Fellowship Workspace</span>
+            <span>→</span>
+          </Link>
+        </div>
+      )}
+
       {/* 1. YOUR NEXT CONTRIBUTION (Top Action Hero) */}
       <div className="rounded-2xl border border-sky-500/30 bg-gradient-to-br from-slate-900 via-sky-950/20 to-slate-900 p-6 sm:p-8 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
@@ -274,7 +353,9 @@ export default async function DashboardPage() {
                 <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
                   <span>{topRecommendation.issue.githubRepo}</span>
                   <span>•</span>
-                  <span className="capitalize">{topRecommendation.issue.difficulty}</span>
+                  <span className="capitalize">
+                    {topRecommendation.issue.difficulty}
+                  </span>
                   {topRecommendation.issue.estimatedEffort && (
                     <>
                       <span>•</span>
@@ -299,14 +380,16 @@ export default async function DashboardPage() {
               {/* Skills Tags */}
               {topRecommendation.issue.skillsRequired.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {topRecommendation.issue.skillsRequired.map((skill: string) => (
-                    <span
-                      key={skill}
-                      className="rounded bg-slate-800/80 border border-slate-700/60 px-2 py-0.5 text-[11px] font-mono text-slate-300"
-                    >
-                      {skill}
-                    </span>
-                  ))}
+                  {topRecommendation.issue.skillsRequired.map(
+                    (skill: string) => (
+                      <span
+                        key={skill}
+                        className="rounded bg-slate-800/80 border border-slate-700/60 px-2 py-0.5 text-[11px] font-mono text-slate-300"
+                      >
+                        {skill}
+                      </span>
+                    ),
+                  )}
                 </div>
               )}
             </div>
@@ -318,12 +401,17 @@ export default async function DashboardPage() {
                   Why this is recommended:
                 </h4>
                 <div className="mt-2.5 space-y-1.5">
-                  {topRecommendation.matchReasons.map((reason: string, i: number) => (
-                    <div key={i} className="flex items-center gap-2 text-xs font-mono text-emerald-400">
-                      <span>✓</span>
-                      <span>{reason}</span>
-                    </div>
-                  ))}
+                  {topRecommendation.matchReasons.map(
+                    (reason: string, i: number) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-2 text-xs font-mono text-emerald-400"
+                      >
+                        <span>✓</span>
+                        <span>{reason}</span>
+                      </div>
+                    ),
+                  )}
                 </div>
               </div>
 
@@ -344,7 +432,8 @@ export default async function DashboardPage() {
               No matching open issues found in official repositories right now.
             </p>
             <p className="text-[11px] text-slate-500">
-              Check back shortly or browse all active issues across official TechNexusOrg repositories.
+              Check back shortly or browse all active issues across official
+              TechNexusOrg repositories.
             </p>
             <Link
               href="/issues"
@@ -366,7 +455,9 @@ export default async function DashboardPage() {
                 Active Contribution Workspaces ({activeClaims.length})
               </h2>
             </div>
-            <span className="text-xs font-mono text-amber-300">In Progress</span>
+            <span className="text-xs font-mono text-amber-300">
+              In Progress
+            </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -383,7 +474,10 @@ export default async function DashboardPage() {
                 </div>
 
                 <h3 className="text-sm font-bold text-white font-mono">
-                  <Link href={`/issues/${claim.issueId}`} className="hover:text-sky-300 transition-colors">
+                  <Link
+                    href={`/issues/${claim.issueId}`}
+                    className="hover:text-sky-300 transition-colors"
+                  >
                     {claim.issueTitle}
                   </Link>
                 </h3>
@@ -413,7 +507,8 @@ export default async function DashboardPage() {
               Contribution Progress & Pipeline
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Verified proof of work drives automatic rank elevation. No fake counts or self-awarded titles.
+              Verified proof of work drives automatic rank elevation. No fake
+              counts or self-awarded titles.
             </p>
           </div>
         </div>
@@ -468,15 +563,17 @@ export default async function DashboardPage() {
 
                   {matchReasons.length > 0 && (
                     <div className="space-y-1 pt-1">
-                      {matchReasons.slice(0, 2).map((reason: string, idx: number) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono"
-                        >
-                          <span>✓</span>
-                          <span>{reason}</span>
-                        </div>
-                      ))}
+                      {matchReasons
+                        .slice(0, 2)
+                        .map((reason: string, idx: number) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono"
+                          >
+                            <span>✓</span>
+                            <span>{reason}</span>
+                          </div>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -515,7 +612,8 @@ export default async function DashboardPage() {
               No contributions recorded yet.
             </p>
             <p className="text-[11px] text-slate-500 mt-1">
-              Claim an issue and submit your pull request on GitHub to see live contribution tracking.
+              Claim an issue and submit your pull request on GitHub to see live
+              contribution tracking.
             </p>
           </div>
         ) : (
@@ -536,7 +634,9 @@ export default async function DashboardPage() {
                     >
                       {contrib.state}
                     </span>
-                    <span className="text-xs font-mono text-slate-400">{contrib.githubRepo}</span>
+                    <span className="text-xs font-mono text-slate-400">
+                      {contrib.githubRepo}
+                    </span>
                   </div>
                   <h4 className="text-xs font-bold text-white font-mono">
                     <a
@@ -571,7 +671,79 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* 6. VERIFIED CREDENTIALS */}
+      {/* 6. ENROLLED LEARNING TRACKS */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+          <div>
+            <h2 className="text-sm font-bold text-white font-mono uppercase tracking-wider">
+              Enrolled Learning Tracks ({userTrackEnrollments.length})
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Hands-on terminal curriculum, architecture deep-dives, and
+              verifiable capstones.
+            </p>
+          </div>
+          <Link
+            href="/learn"
+            className="text-xs font-mono text-sky-400 hover:text-sky-300 underline"
+          >
+            Browse All Tracks →
+          </Link>
+        </div>
+
+        {userTrackEnrollments.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-800 p-6 text-center">
+            <p className="text-xs text-slate-400 font-mono">
+              Not enrolled in any structured learning tracks yet.
+            </p>
+            <Link
+              href="/learn"
+              className="mt-3 inline-block rounded-lg bg-sky-500/10 border border-sky-500/30 px-4 py-1.5 text-xs font-mono text-sky-300 hover:bg-sky-500/20 transition-colors"
+            >
+              Explore Linux &amp; Git Tracks →
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {userTrackEnrollments.map((enrollment: any) => (
+              <div
+                key={enrollment.id}
+                className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="capitalize text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    {enrollment.status.replace("_", " ")}
+                  </span>
+                  <span className="text-slate-500">
+                    ⏱ {enrollment.estimatedHours} hrs
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white font-mono">
+                  <Link
+                    href={`/learn/${enrollment.trackSlug}`}
+                    className="hover:text-sky-400 transition-colors"
+                  >
+                    {enrollment.trackTitle}
+                  </Link>
+                </h3>
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-500 capitalize">
+                    {enrollment.difficulty}
+                  </span>
+                  <Link
+                    href={`/learn/${enrollment.trackSlug}`}
+                    className="text-sky-400 hover:underline"
+                  >
+                    Continue Track →
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 7. VERIFIED CREDENTIALS */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <h2 className="text-sm font-bold text-white font-mono uppercase tracking-wider">
@@ -588,7 +760,8 @@ export default async function DashboardPage() {
               No credentials issued yet.
             </p>
             <p className="text-[11px] text-slate-500 mt-1">
-              Merge your first pull request on an official project to earn the verified #FirstPR credential.
+              Merge your first pull request on an official project to earn the
+              verified #FirstPR credential.
             </p>
           </div>
         ) : (
@@ -606,7 +779,9 @@ export default async function DashboardPage() {
                     {new Date(cred.issuedAt).toLocaleDateString()}
                   </span>
                 </div>
-                <h4 className="text-sm font-bold text-white font-mono">{cred.title}</h4>
+                <h4 className="text-sm font-bold text-white font-mono">
+                  {cred.title}
+                </h4>
                 <p className="text-xs text-slate-400">{cred.description}</p>
                 <div className="pt-2">
                   <Link
@@ -622,22 +797,34 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* 7. SUPPORTING STATS */}
+      {/* 8. SUPPORTING STATS */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-          <div className="text-xs font-mono uppercase text-slate-400">Total PRs Merged</div>
-          <div className="mt-2 font-mono text-3xl font-bold text-white">{mergedCount}</div>
-          <div className="mt-1 text-[11px] text-slate-500">Official TechNexus repositories</div>
+          <div className="text-xs font-mono uppercase text-slate-400">
+            Total PRs Merged
+          </div>
+          <div className="mt-2 font-mono text-3xl font-bold text-white">
+            {mergedCount}
+          </div>
+          <div className="mt-1 text-[11px] text-slate-500">
+            Official TechNexus repositories
+          </div>
         </div>
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-          <div className="text-xs font-mono uppercase text-slate-400">Verified Credentials</div>
+          <div className="text-xs font-mono uppercase text-slate-400">
+            Verified Credentials
+          </div>
           <div className="mt-2 font-mono text-3xl font-bold text-emerald-400">
             {userCredentials.length}
           </div>
-          <div className="mt-1 text-[11px] text-slate-500">Verifiable records</div>
+          <div className="mt-1 text-[11px] text-slate-500">
+            Verifiable records
+          </div>
         </div>
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-          <div className="text-xs font-mono uppercase text-slate-400">Experience Profile</div>
+          <div className="text-xs font-mono uppercase text-slate-400">
+            Experience Profile
+          </div>
           <div className="mt-2 font-mono text-xl font-bold text-sky-400 capitalize">
             {profile?.experienceLevel?.replace("_", " ") || "Beginner"}
           </div>

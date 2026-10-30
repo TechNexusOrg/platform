@@ -8,7 +8,8 @@ import { AdminDashboardClient } from "./AdminDashboardClient";
 
 export const metadata = {
   title: "Maintainer & Admin Operations — TechNexusOrg",
-  description: "Repository approvals, issue difficulty classification, and PR review triage.",
+  description:
+    "Repository approvals, issue difficulty classification, and PR review triage.",
 };
 
 export const dynamic = "force-dynamic";
@@ -81,7 +82,10 @@ export default async function AdminPage() {
       openedAt: schema.pullRequests.openedAt,
     })
     .from(schema.pullRequests)
-    .innerJoin(schema.projects, eq(schema.pullRequests.projectId, schema.projects.id))
+    .innerJoin(
+      schema.projects,
+      eq(schema.pullRequests.projectId, schema.projects.id),
+    )
     .where(eq(schema.pullRequests.state, "open"))
     .orderBy(desc(schema.pullRequests.openedAt));
 
@@ -97,10 +101,28 @@ export default async function AdminPage() {
       issueNumber: schema.issues.githubIssueNumber,
     })
     .from(schema.mentorRequests)
-    .innerJoin(schema.users, eq(schema.mentorRequests.studentId, schema.users.id))
-    .innerJoin(schema.issues, eq(schema.mentorRequests.issueId, schema.issues.id))
+    .innerJoin(
+      schema.users,
+      eq(schema.mentorRequests.studentId, schema.users.id),
+    )
+    .innerJoin(
+      schema.issues,
+      eq(schema.mentorRequests.issueId, schema.issues.id),
+    )
     .orderBy(desc(schema.mentorRequests.createdAt))
     .limit(50);
+
+  // 5. Fetch partner proposals
+  let partnerProposals: any[] = [];
+  try {
+    partnerProposals = await db
+      .select()
+      .from(schema.partnerProposals)
+      .orderBy(desc(schema.partnerProposals.createdAt))
+      .limit(50);
+  } catch {
+    partnerProposals = [];
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
@@ -109,14 +131,17 @@ export default async function AdminPage() {
           Maintainer Operations Center
         </h1>
         <p className="mt-1 text-xs text-slate-400">
-          Review official repository trust boundaries, classify issue difficulty, and monitor PR review queues.
+          Review official repository trust boundaries, classify issue
+          difficulty, and monitor PR review queues.
         </p>
       </div>
 
       <AdminDashboardClient
         projects={projects.map((p: any) => ({
           ...p,
-          approvedAt: p.approvedAt ? (p.approvedAt as Date).toISOString() : null,
+          approvedAt: p.approvedAt
+            ? (p.approvedAt as Date).toISOString()
+            : null,
         }))}
         issues={issues as any}
         prs={prs.map((pr: any) => ({
@@ -124,6 +149,10 @@ export default async function AdminPage() {
           openedAt: (pr.openedAt as Date).toISOString(),
         }))}
         mentorRequests={mentorRequests as any}
+        partnerProposals={partnerProposals.map((prop: any) => ({
+          ...prop,
+          createdAt: (prop.createdAt as Date).toISOString(),
+        }))}
       />
     </div>
   );

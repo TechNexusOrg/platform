@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
-import { listInternshipPrograms, getInternshipPortalData } from "@/lib/internships/service";
-import { Navbar } from "@/components/Navbar";
+import {
+  listInternshipPrograms,
+  getInternshipPortalData,
+} from "@/lib/internships/service";
 import { ApplyModal } from "./ApplyModal";
 
 export const metadata = {
@@ -23,8 +25,6 @@ export default async function InternshipsPage() {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100">
-      <Navbar />
-
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         {/* Banner if enrolled */}
         {portalData?.enrollment && (
@@ -32,10 +32,13 @@ export default async function InternshipsPage() {
             <div>
               <div className="flex items-center gap-2 text-xs font-mono text-sky-400">
                 <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
-                <span>Active Fellowship Enrollment: {portalData.program.title}</span>
+                <span>
+                  Active Fellowship Enrollment: {portalData.program.title}
+                </span>
               </div>
               <p className="text-sm text-slate-300 mt-1">
-                Access your milestones, submit weekly work logs, and track mentor evaluations in your Contributor Portal.
+                Access your milestones, submit weekly work logs, and track
+                mentor evaluations in your Contributor Portal.
               </p>
             </div>
             <Link
@@ -57,9 +60,10 @@ export default async function InternshipsPage() {
             Engineering Fellowships
           </h1>
           <p className="mt-3 text-base sm:text-lg text-slate-400 leading-relaxed">
-            Move beyond certificates and tutorial clones. Work as an apprentice software engineer
-            under experienced open-source maintainers. Ship real pull requests, defend your architectural choices,
-            and build undeniable proof of work.
+            Move beyond certificates and tutorial clones. Work as an apprentice
+            software engineer under experienced open-source maintainers. Ship
+            real pull requests, defend your architectural choices, and build
+            undeniable proof of work.
           </p>
           <div className="mt-6">
             <ApplyModal programs={programs} isLoggedIn={!!user} />
@@ -73,7 +77,8 @@ export default async function InternshipsPage() {
               01. Real Repositories
             </div>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Every deliverable is an actual pull request merged into official TechNexusOrg repositories. Zero fake metrics or toy projects.
+              Every deliverable is an actual pull request merged into official
+              TechNexusOrg repositories. Zero fake metrics or toy projects.
             </p>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
@@ -81,7 +86,8 @@ export default async function InternshipsPage() {
               02. 1-on-1 Mentorship
             </div>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Assigned engineering maintainers review your PRs, provide weekly code critique, and unblock architectural bottlenecks.
+              Assigned engineering maintainers review your PRs, provide weekly
+              code critique, and unblock architectural bottlenecks.
             </p>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
@@ -89,7 +95,8 @@ export default async function InternshipsPage() {
               03. Cryptographic Proof
             </div>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Offers and graduation credentials contain tamper-evident SHA-256 verification hashes verifiable by employers and universities.
+              Offers and graduation credentials contain tamper-evident SHA-256
+              verification hashes verifiable by employers and universities.
             </p>
           </div>
         </div>
@@ -141,12 +148,16 @@ export default async function InternshipsPage() {
                       Target Learning Outcomes
                     </h4>
                     <ul className="text-xs sm:text-sm text-slate-300 space-y-1.5">
-                      {program.learningOutcomes.map((outcome: string, idx: number) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-emerald-400 font-bold">•</span>
-                          <span>{outcome}</span>
-                        </li>
-                      ))}
+                      {program.learningOutcomes.map(
+                        (outcome: string, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-emerald-400 font-bold">
+                              •
+                            </span>
+                            <span>{outcome}</span>
+                          </li>
+                        ),
+                      )}
                     </ul>
                   </div>
 
@@ -155,12 +166,14 @@ export default async function InternshipsPage() {
                       Eligibility & Prerequisites
                     </h4>
                     <ul className="text-xs sm:text-sm text-slate-300 space-y-1.5">
-                      {program.prerequisites.map((prereq: string, idx: number) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-amber-400 font-bold">•</span>
-                          <span>{prereq}</span>
-                        </li>
-                      ))}
+                      {program.prerequisites.map(
+                        (prereq: string, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-amber-400 font-bold">•</span>
+                            <span>{prereq}</span>
+                          </li>
+                        ),
+                      )}
                     </ul>
                   </div>
                 </div>
