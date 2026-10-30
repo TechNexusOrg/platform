@@ -695,3 +695,213 @@ export const assignmentSubmissions = pgTable(
     index("assignment_submissions_status_idx").on(table.status),
   ]
 );
+
+// --- INTERNSHIP PROGRAMS ---
+export const internshipPrograms = pgTable(
+  "internship_programs",
+  {
+    id: text("id").primaryKey(),
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    track: text("track", {
+      enum: ["systems", "web_fullstack", "devops_infra", "developer_experience"],
+    })
+      .default("systems")
+      .notNull(),
+    description: text("description").notNull(),
+    durationWeeks: integer("duration_weeks").default(8).notNull(),
+    isPublished: boolean("is_published").default(true).notNull(),
+    prerequisites: jsonb("prerequisites").$type<string[]>().default([]).notNull(),
+    learningOutcomes: jsonb("learning_outcomes").$type<string[]>().default([]).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("internship_programs_slug_idx").on(table.slug),
+    index("internship_programs_is_published_idx").on(table.isPublished),
+  ]
+);
+
+// --- COHORTS ---
+export const cohorts = pgTable(
+  "cohorts",
+  {
+    id: text("id").primaryKey(),
+    programId: text("program_id")
+      .notNull()
+      .references(() => internshipPrograms.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    startDate: timestamp("start_date", { withTimezone: true }).notNull(),
+    endDate: timestamp("end_date", { withTimezone: true }).notNull(),
+    capacity: integer("capacity").default(25).notNull(),
+    status: text("status", { enum: ["upcoming", "active", "completed"] })
+      .default("upcoming")
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("cohorts_program_id_idx").on(table.programId),
+    index("cohorts_status_idx").on(table.status),
+  ]
+);
+
+// --- INTERNSHIP APPLICATIONS ---
+export const internshipApplications = pgTable(
+  "internship_applications",
+  {
+    id: text("id").primaryKey(),
+    programId: text("program_id")
+      .notNull()
+      .references(() => internshipPrograms.id, { onDelete: "cascade" }),
+    cohortId: text("cohort_id").references(() => cohorts.id, { onDelete: "set null" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    statement: text("statement").notNull(),
+    weeklyAvailabilityHours: integer("weekly_availability_hours").notNull(),
+    githubProfile: text("github_profile").notNull(),
+    priorExperience: text("prior_experience").notNull(),
+    status: text("status", {
+      enum: ["pending", "under_review", "accepted", "rejected"],
+    })
+      .default("pending")
+      .notNull(),
+    reviewedBy: text("reviewed_by").references(() => users.id),
+    reviewNotes: text("review_notes"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("internship_applications_user_idx").on(table.userId),
+    index("internship_applications_program_idx").on(table.programId),
+    index("internship_applications_status_idx").on(table.status),
+  ]
+);
+
+// --- INTERNSHIP ENROLLMENTS ---
+export const internshipEnrollments = pgTable(
+  "internship_enrollments",
+  {
+    id: text("id").primaryKey(),
+    programId: text("program_id")
+      .notNull()
+      .references(() => internshipPrograms.id, { onDelete: "cascade" }),
+    cohortId: text("cohort_id").references(() => cohorts.id, { onDelete: "set null" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    mentorId: text("mentor_id").references(() => users.id),
+    offerLetterId: text("offer_letter_id"),
+    offerHash: text("offer_hash"),
+    status: text("status", {
+      enum: ["offered", "active", "completed", "withdrawn", "terminated"],
+    })
+      .default("active")
+      .notNull(),
+    startDate: timestamp("start_date", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    targetEndDate: timestamp("target_end_date", { withTimezone: true }).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("internship_enrollments_user_prog_idx").on(table.userId, table.programId),
+    index("internship_enrollments_user_idx").on(table.userId),
+    index("internship_enrollments_mentor_idx").on(table.mentorId),
+    index("internship_enrollments_status_idx").on(table.status),
+  ]
+);
+
+// --- INTERNSHIP MILESTONES ---
+export const internshipMilestones = pgTable(
+  "internship_milestones",
+  {
+    id: text("id").primaryKey(),
+    programId: text("program_id")
+      .notNull()
+      .references(() => internshipPrograms.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    weekNumber: integer("week_number").notNull(),
+    requiredDeliverables: jsonb("required_deliverables").$type<string[]>().default([]).notNull(),
+    orderIndex: integer("order_index").default(0).notNull(),
+  },
+  (table) => [
+    index("internship_milestones_program_idx").on(table.programId),
+    index("internship_milestones_week_idx").on(table.programId, table.weekNumber),
+  ]
+);
+
+// --- INTERNSHIP WORK LOGS ---
+export const internshipWorkLogs = pgTable(
+  "internship_work_logs",
+  {
+    id: text("id").primaryKey(),
+    enrollmentId: text("enrollment_id")
+      .notNull()
+      .references(() => internshipEnrollments.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    weekNumber: integer("week_number").notNull(),
+    hoursSpent: integer("hours_spent").notNull(),
+    summary: text("summary").notNull(),
+    pullRequestUrls: jsonb("pull_request_urls").$type<string[]>().default([]).notNull(),
+    blockers: text("blockers"),
+    mentorFeedback: text("mentor_feedback"),
+    mentorReviewedAt: timestamp("mentor_reviewed_at", { withTimezone: true }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("internship_work_logs_enrollment_idx").on(table.enrollmentId),
+    index("internship_work_logs_user_idx").on(table.userId),
+    index("internship_work_logs_week_idx").on(table.enrollmentId, table.weekNumber),
+  ]
+);
+
+// --- INTERNSHIP EVALUATIONS ---
+export const internshipEvaluations = pgTable(
+  "internship_evaluations",
+  {
+    id: text("id").primaryKey(),
+    enrollmentId: text("enrollment_id")
+      .notNull()
+      .references(() => internshipEnrollments.id, { onDelete: "cascade" }),
+    mentorId: text("mentor_id")
+      .notNull()
+      .references(() => users.id),
+    codeQualityScore: integer("code_quality_score").notNull(),
+    collaborationScore: integer("collaboration_score").notNull(),
+    punctualityScore: integer("punctuality_score").notNull(),
+    documentationScore: integer("documentation_score").notNull(),
+    technicalInitiativeScore: integer("technical_initiative_score").notNull(),
+    overallFeedback: text("overall_feedback").notNull(),
+    recommendCompletion: boolean("recommend_completion").default(true).notNull(),
+    evaluatedAt: timestamp("evaluated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("internship_evaluations_enrollment_idx").on(table.enrollmentId),
+    index("internship_evaluations_mentor_idx").on(table.mentorId),
+  ]
+);
