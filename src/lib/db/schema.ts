@@ -511,3 +511,187 @@ export const mentorRequests = pgTable(
     index("mentor_requests_status_idx").on(table.status),
   ]
 );
+
+// --- LEARNING TRACKS ---
+export const learningTracks = pgTable(
+  "learning_tracks",
+  {
+    id: text("id").primaryKey(),
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    difficulty: text("difficulty", { enum: ["beginner", "intermediate", "advanced"] })
+      .default("beginner")
+      .notNull(),
+    estimatedHours: integer("estimated_hours").default(10).notNull(),
+    isPublished: boolean("is_published").default(false).notNull(),
+    prerequisites: jsonb("prerequisites").$type<string[]>().default([]).notNull(),
+    objectives: jsonb("objectives").$type<string[]>().default([]).notNull(),
+    orderIndex: integer("order_index").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("learning_tracks_slug_idx").on(table.slug),
+    index("learning_tracks_is_published_idx").on(table.isPublished),
+  ]
+);
+
+// --- LEARNING MODULES ---
+export const learningModules = pgTable(
+  "learning_modules",
+  {
+    id: text("id").primaryKey(),
+    trackId: text("track_id")
+      .notNull()
+      .references(() => learningTracks.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    orderIndex: integer("order_index").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("learning_modules_track_id_idx").on(table.trackId),
+    index("learning_modules_order_idx").on(table.trackId, table.orderIndex),
+  ]
+);
+
+// --- LEARNING LESSONS ---
+export const learningLessons = pgTable(
+  "learning_lessons",
+  {
+    id: text("id").primaryKey(),
+    moduleId: text("module_id")
+      .notNull()
+      .references(() => learningModules.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    content: text("content").notNull(), // Markdown formatted
+    estimatedMinutes: integer("estimated_minutes").default(15).notNull(),
+    orderIndex: integer("order_index").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("learning_lessons_module_id_idx").on(table.moduleId),
+    index("learning_lessons_order_idx").on(table.moduleId, table.orderIndex),
+  ]
+);
+
+// --- LEARNING ENROLLMENTS ---
+export const learningEnrollments = pgTable(
+  "learning_enrollments",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    trackId: text("track_id")
+      .notNull()
+      .references(() => learningTracks.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["enrolled", "in_progress", "completed"] })
+      .default("enrolled")
+      .notNull(),
+    enrolledAt: timestamp("enrolled_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("learning_enrollments_user_track_idx").on(table.userId, table.trackId),
+    index("learning_enrollments_user_id_idx").on(table.userId),
+    index("learning_enrollments_track_id_idx").on(table.trackId),
+  ]
+);
+
+// --- LESSON PROGRESS ---
+export const lessonProgress = pgTable(
+  "lesson_progress",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lessonId: text("lesson_id")
+      .notNull()
+      .references(() => learningLessons.id, { onDelete: "cascade" }),
+    completed: boolean("completed").default(true).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("lesson_progress_user_lesson_idx").on(table.userId, table.lessonId),
+    index("lesson_progress_user_id_idx").on(table.userId),
+    index("lesson_progress_lesson_id_idx").on(table.lessonId),
+  ]
+);
+
+// --- LEARNING ASSIGNMENTS ---
+export const learningAssignments = pgTable(
+  "learning_assignments",
+  {
+    id: text("id").primaryKey(),
+    lessonId: text("lesson_id")
+      .notNull()
+      .references(() => learningLessons.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    acceptanceCriteria: jsonb("acceptance_criteria").$type<string[]>().default([]).notNull(),
+    submissionType: text("submission_type", {
+      enum: ["github_pr", "text_submission", "terminal_output"],
+    })
+      .default("text_submission")
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index("learning_assignments_lesson_id_idx").on(table.lessonId)]
+);
+
+// --- ASSIGNMENT SUBMISSIONS ---
+export const assignmentSubmissions = pgTable(
+  "assignment_submissions",
+  {
+    id: text("id").primaryKey(),
+    assignmentId: text("assignment_id")
+      .notNull()
+      .references(() => learningAssignments.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    status: text("status", { enum: ["submitted", "approved", "needs_revision"] })
+      .default("submitted")
+      .notNull(),
+    reviewedBy: text("reviewed_by").references(() => users.id),
+    feedback: text("feedback"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("assignment_submissions_user_idx").on(table.userId),
+    index("assignment_submissions_assignment_idx").on(table.assignmentId),
+    index("assignment_submissions_status_idx").on(table.status),
+  ]
+);
