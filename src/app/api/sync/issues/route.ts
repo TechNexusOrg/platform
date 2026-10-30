@@ -1,24 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken, COOKIE_NAME } from "@/lib/auth/session";
+import { getFreshAuthenticatedUser, hasRole } from "@/lib/auth/authorization";
 import { syncRepositoryIssues } from "@/lib/github/issues";
+import { env, safeCompare } from "@/lib/env";
 
 export async function POST(request: NextRequest) {
-  const token = request.cookies.get(COOKIE_NAME)?.value;
-  const user = token ? await verifySessionToken(token) : null;
-
-  // Verify privileged role or internal bearer secret
+  // 1. Verify service bearer token using constant-time comparison
   const authHeader = request.headers.get("authorization");
-  const isAuthorizedSecret =
-    authHeader && process.env.AUTH_SECRET && authHeader === `Bearer ${process.env.AUTH_SECRET}`;
+  const expectedBearer = `Bearer ${env.INTERNAL_SERVICE_SECRET}`;
+  const isAuthorizedService = safeCompare(authHeader, expectedBearer);
 
-  if (!isAuthorizedSecret && (!user || (user.role !== "admin" && user.role !== "maintainer"))) {
-    return NextResponse.json({ error: "Unauthorized. Admin or maintainer privileges required." }, { status: 403 });
+  let isAuthorizedUser = false;
+  if (!isAuthorizedService) {
+    // 2. Fall back to fresh server-side DB session verification
+    const freshUser = await getFreshAuthenticatedUser(request);
+    if (freshUser && hasRole(freshUser, ["admin", "maintainer"])) {
+      // CSRF / Origin validation for session cookie requests
+      const origin = request.headers.get("origin");
+      const host = request.headers.get("host");
+      if (origin && host) {
+        try {
+          const originHost = new URL(origin).host;
+          if (originHost !== host) {
+            return NextResponse.json({ error: "CSRF protection: Invalid origin." }, { status: 403 });
+          }
+        } catch {
+          return NextResponse.json({ error: "CSRF protection: Malformed origin." }, { status: 403 });
+        }
+      }
+      isAuthorizedUser = true;
+    }
+  }
+
+  if (!isAuthorizedService && !isAuthorizedUser) {
+    return NextResponse.json(
+      { error: "Unauthorized. Admin or maintainer privileges required." },
+      { status: 403 }
+    );
   }
 
   try {
     const body = await request.json().catch(() => ({}));
-    const owner = body.owner || "TechNexusOrg";
-    const repo = body.repo || "platform";
+    const owner = (body.owner || env.TECH_NEXUS_ORG_NAME).trim();
+    const repo = (body.repo || "platform").trim();
+
+    // Trust boundary: enforce official organization
+    if (owner.toLowerCase() !== env.TECH_NEXUS_ORG_NAME.toLowerCase()) {
+      return NextResponse.json(
+        { error: `Forbidden: Only repositories under ${env.TECH_NEXUS_ORG_NAME} may be synced.` },
+        { status: 400 }
+      );
+    }
 
     const result = await syncRepositoryIssues(owner, repo);
 
@@ -30,6 +61,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Issue sync error:", error);
-    return NextResponse.json({ error: error.message || "Failed to sync issues" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to sync issues" },
+      { status: 500 }
+    );
   }
 }

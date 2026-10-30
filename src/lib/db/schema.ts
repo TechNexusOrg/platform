@@ -107,6 +107,8 @@ export const projects = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     githubRepo: text("github_repo").notNull().unique(), // e.g. "TechNexusOrg/platform"
+    githubRepoId: integer("github_repo_id"),
+    githubOwnerId: integer("github_owner_id"),
     description: text("description").notNull(),
     primaryLanguage: text("primary_language").notNull(),
     languages: jsonb("languages").$type<string[]>().default([]).notNull(),
@@ -133,6 +135,8 @@ export const projects = pgTable(
   (table) => [
     uniqueIndex("projects_slug_idx").on(table.slug),
     uniqueIndex("projects_repo_idx").on(table.githubRepo),
+    index("projects_github_repo_id_idx").on(table.githubRepoId),
+    index("projects_github_owner_id_idx").on(table.githubOwnerId),
   ]
 );
 

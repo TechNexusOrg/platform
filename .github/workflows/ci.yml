@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Lint, Test & Build
@@ -37,5 +40,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          CI: "true"
           AUTH_SECRET: "ci_build_dummy_secret_key_strictly_for_testing_32_chars"
+          INTERNAL_SERVICE_SECRET: "ci_service_dummy_secret_key_strictly_for_testing_32_chars"
           APP_URL: http://localhost:3000

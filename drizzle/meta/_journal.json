@@ -8,6 +8,41 @@
       "when": 1790358237482,
       "tag": "0000_demonic_owl",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791000000000,
+      "tag": "0001_sprint_lifecycle_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792000000000,
+      "tag": "0002_issue_body",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792500000000,
+      "tag": "0003_pr_nullable_user",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793000000000,
+      "tag": "0004_mvp_hardening",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793325000000,
+      "tag": "0005_project_trust_boundary",
+      "breakpoints": true
     }
   ]
 }

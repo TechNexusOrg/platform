@@ -1,5 +1,6 @@
 import { getGitHubClient, checkRateLimit } from "./client";
 import { getDb, schema } from "@/lib/db";
+import { env } from "@/lib/env";
 import { eq } from "drizzle-orm";
 
 export interface ParsedIssueMetadata {
@@ -89,6 +90,13 @@ export async function syncRepositoryIssues(
   repo: string,
   userToken?: string
 ): Promise<{ syncedCount: number; rateLimitRemaining?: number }> {
+  // Trust boundary enforcement: reject external owners
+  if (owner.toLowerCase() !== env.TECH_NEXUS_ORG_NAME.toLowerCase()) {
+    throw new Error(
+      `Security violation: Repository owner "${owner}" is outside official ${env.TECH_NEXUS_ORG_NAME} trust boundary.`
+    );
+  }
+
   const octokit = getGitHubClient(userToken);
   const rateLimit = await checkRateLimit(octokit);
 
@@ -103,6 +111,18 @@ export async function syncRepositoryIssues(
     owner,
     repo,
   });
+
+  // Verify canonical organization ID and owner login against live GitHub API
+  const repoOwnerId = (repoData.owner as any)?.id;
+  const repoOwnerLogin = (repoData.owner as any)?.login;
+  if (
+    repoOwnerId !== env.TECH_NEXUS_ORG_ID ||
+    repoOwnerLogin?.toLowerCase() !== env.TECH_NEXUS_ORG_NAME.toLowerCase()
+  ) {
+    throw new Error(
+      `Security violation: Repository ${repoData.full_name} is not owned by verified ${env.TECH_NEXUS_ORG_NAME} organization.`
+    );
+  }
 
   const db = await getDb();
   const repoFullName = repoData.full_name;
@@ -121,6 +141,8 @@ export async function syncRepositoryIssues(
       .update(schema.projects)
       .set({
         name: repoData.name,
+        githubRepoId: repoData.id,
+        githubOwnerId: repoOwnerId,
         description: repoData.description || "Official TechNexusOrg repository",
         primaryLanguage: repoData.language || "TypeScript",
         starsCount: repoData.stargazers_count,
@@ -136,10 +158,14 @@ export async function syncRepositoryIssues(
       name: repoData.name,
       slug: repoData.name.toLowerCase(),
       githubRepo: repoFullName,
+      githubRepoId: repoData.id,
+      githubOwnerId: repoOwnerId,
       description: repoData.description || "Official TechNexusOrg repository",
       primaryLanguage: repoData.language || "TypeScript",
       languages: repoData.language ? [repoData.language] : [],
-      isOfficial: true,
+      isOfficial: false, // Default to unapproved until maintainer review
+      contributionEnabled: false,
+      firstPrEnabled: false,
       starsCount: repoData.stargazers_count,
       forksCount: repoData.forks_count,
       openIssuesCount: repoData.open_issues_count,

@@ -22,6 +22,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
+  // Delivery identifier is mandatory for audit & idempotency
+  if (!deliveryId) {
+    return NextResponse.json(
+      { error: "Missing required X-GitHub-Delivery header" },
+      { status: 400 }
+    );
+  }
+
   let repoName: string | undefined;
   try {
     const parsed = JSON.parse(rawBody);

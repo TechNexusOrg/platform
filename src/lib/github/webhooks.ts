@@ -107,8 +107,9 @@ export interface WebhookPullRequestEvent {
     id: number;
     name: string;
     full_name: string;
-    owner: {
+    owner?: {
       login: string;
+      id?: number;
     };
   };
   sender: {
@@ -346,8 +347,14 @@ export async function handlePullRequestWebhook(
   let isContributionEligible = false;
 
   if (matchingProjects.length === 0) {
-    const isTechNexusOrg = repoFullName.toLowerCase().startsWith("technexusorg/");
-    if (!isTechNexusOrg) {
+    const orgName = env.TECH_NEXUS_ORG_NAME.toLowerCase();
+    const repoOwner = (payload.repository.owner?.login || repoFullName.split("/")[0]).toLowerCase();
+    const repoOwnerId = payload.repository.owner?.id;
+
+    const isTechNexusOrg = repoOwner === orgName;
+    const isVerifiedOrgId = !repoOwnerId || repoOwnerId === env.TECH_NEXUS_ORG_ID;
+
+    if (!isTechNexusOrg || !isVerifiedOrgId) {
       return {
         handled: false,
         reason: "Repository outside official organization trust boundary.",
@@ -362,6 +369,8 @@ export async function handlePullRequestWebhook(
       name: payload.repository.name,
       slug: payload.repository.name.toLowerCase(),
       githubRepo: repoFullName,
+      githubRepoId: payload.repository.id,
+      githubOwnerId: repoOwnerId || env.TECH_NEXUS_ORG_ID,
       description: `Discovered repository: ${repoFullName}`,
       primaryLanguage: "TypeScript",
       languages: [],
@@ -374,9 +383,17 @@ export async function handlePullRequestWebhook(
   } else {
     const project = matchingProjects[0];
     projectId = project.id;
-    // Strictly require official, approved, and contribution enabled
+
+    // Trust boundary verification against stored or payload owner ID
+    const isOwnerTrusted =
+      !project.githubOwnerId || project.githubOwnerId === env.TECH_NEXUS_ORG_ID;
+
+    // Strictly require official, approved, contribution enabled, and trusted owner
     isContributionEligible =
-      project.isOfficial && project.contributionEnabled && !!project.approvedAt;
+      project.isOfficial &&
+      project.contributionEnabled &&
+      !!project.approvedAt &&
+      isOwnerTrusted;
   }
 
   if (!isContributionEligible) {
