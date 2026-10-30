@@ -64,6 +64,13 @@
       "when": 1793328000000,
       "tag": "0008_internship_management",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793329000000,
+      "tag": "0009_cryptographic_credentials",
+      "breakpoints": true
     }
   ]
 }
