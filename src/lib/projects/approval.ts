@@ -1,4 +1,5 @@
 import { getDb, schema } from "@/lib/db";
+import { env } from "@/lib/env";
 import { eq } from "drizzle-orm";
 
 export async function approveProject(
@@ -23,6 +24,23 @@ export async function approveProject(
     throw new Error("Project not found.");
   }
 
+  // Enforce repository trust boundary
+  const isOfficialOrg = project.githubRepo
+    .toLowerCase()
+    .startsWith(`${env.TECH_NEXUS_ORG_NAME.toLowerCase()}/`);
+
+  if (!isOfficialOrg) {
+    throw new Error(
+      `Security violation: Repository "${project.githubRepo}" does not belong to the official ${env.TECH_NEXUS_ORG_NAME} organization.`
+    );
+  }
+
+  if (project.githubOwnerId && project.githubOwnerId !== env.TECH_NEXUS_ORG_ID) {
+    throw new Error(
+      `Security violation: Repository owner ID ${project.githubOwnerId} does not match verified organization ID ${env.TECH_NEXUS_ORG_ID}.`
+    );
+  }
+
   const [updated] = await db
     .update(schema.projects)
     .set({
@@ -45,6 +63,8 @@ export async function approveProject(
     targetId: projectId,
     metadata: {
       githubRepo: project.githubRepo,
+      githubRepoId: project.githubRepoId,
+      githubOwnerId: project.githubOwnerId,
       contributionEnabled: updated.contributionEnabled,
       firstPrEnabled: updated.firstPrEnabled,
     },
@@ -93,6 +113,7 @@ export async function rejectProject(
     targetId: projectId,
     metadata: {
       githubRepo: project.githubRepo,
+      githubRepoId: project.githubRepoId,
     },
     createdAt: now,
   });

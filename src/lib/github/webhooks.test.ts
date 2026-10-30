@@ -560,5 +560,53 @@ describe("GitHub Webhooks & PR Lifecycle Engine", () => {
       expect(result.reason).toMatch(/unapproved or contributions are disabled/i);
       expect(result.contributionId).toBeUndefined();
     });
+
+    it("rejects PR events where repository owner ID does not match TechNexusOrg ID", async () => {
+      const db = await getDb();
+      const spoofedOrgEvent: WebhookPullRequestEvent = {
+        action: "opened",
+        pull_request: {
+          id: 99111,
+          number: 1,
+          title: "Spoofed Org PR",
+          body: "Test",
+          html_url: "https://github.com/TechNexusOrg/spoofed-repo/pull/1",
+          state: "open",
+          draft: false,
+          merged: false,
+          merged_at: null,
+          user: {
+            id: 998877,
+            login: "contributor_cathy",
+            avatar_url: "https://avatars.githubusercontent.com/u/998877",
+          },
+          base: {
+            repo: {
+              id: 88111,
+              name: "spoofed-repo",
+              full_name: "TechNexusOrg/spoofed-repo",
+              html_url: "https://github.com/TechNexusOrg/spoofed-repo",
+            },
+          },
+        },
+        repository: {
+          id: 88111,
+          name: "spoofed-repo",
+          full_name: "TechNexusOrg/spoofed-repo",
+          owner: {
+            login: "TechNexusOrg",
+            id: 111222333, // Not 333899669
+          } as any,
+        },
+        sender: {
+          id: 998877,
+          login: "contributor_cathy",
+        },
+      };
+
+      const result = await handlePullRequestWebhook(spoofedOrgEvent, db);
+      expect(result.handled).toBe(false);
+      expect(result.reason).toMatch(/outside official organization trust boundary/i);
+    });
   });
 });
