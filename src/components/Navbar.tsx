@@ -22,6 +22,9 @@ export async function Navbar() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
+            <Link href="/learn" className="hover:text-white transition-colors">
+              Learn
+            </Link>
             <Link href="/issues" className="hover:text-white transition-colors">
               Issues
             </Link>

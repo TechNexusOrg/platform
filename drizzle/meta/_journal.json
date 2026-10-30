@@ -50,6 +50,13 @@
       "when": 1793326000000,
       "tag": "0006_privacy_and_governance",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793327000000,
+      "tag": "0007_learning_platform",
+      "breakpoints": true
     }
   ]
 }
