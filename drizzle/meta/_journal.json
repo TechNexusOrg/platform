@@ -43,6 +43,13 @@
       "when": 1793325000000,
       "tag": "0005_project_trust_boundary",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793326000000,
+      "tag": "0006_privacy_and_governance",
+      "breakpoints": true
     }
   ]
 }
